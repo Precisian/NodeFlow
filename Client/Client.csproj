@@ -8,4 +8,14 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Remove="Views\Logo_NodeFlow.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Views\Logo_NodeFlow.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
 </Project>

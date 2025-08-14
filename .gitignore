@@ -5,3 +5,4 @@
 /.vs
 /Client/.vs/Client
 /Client/obj
+/Client/bin/Debug/net8.0-windows

@@ -1,0 +1,95 @@
+﻿<UserControl x:Class="Client.Views.Node"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:Client.Views"
+             mc:Ignorable="d" Height="135" Width="150">
+    <Grid>
+        <!-- 노드 컨테이너 -->
+        <Border Background="White" BorderBrush="Black" BorderThickness="1" CornerRadius="10">
+            <StackPanel Margin="10">
+                <!-- 상단 헤더 (색상 변경 가능) -->
+                <Border CornerRadius="5,5,0,0" Height="20"
+                        Background="{Binding NodeHeaderColor}">
+                    <TextBox Text="{Binding NodeTitle}" HorizontalAlignment="Center" VerticalAlignment="Center" 
+                             BorderThickness="0" Background="Transparent" />
+                </Border>
+
+                <!-- 작업명 텍스트 박스 -->
+                <TextBlock Text="{Binding TaskName}" Margin="5,5,5,5"/>
+
+                <!-- 날짜 및 담당자 필드 -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <Border BorderBrush="Gray" BorderThickness="1" Grid.Row="0" CornerRadius="2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Text="시작일" Margin="2,2,2,2" Grid.Column="0"/>
+                            <TextBlock Text="{Binding StartDate}" Grid.Column="1" Margin="2,2,2,2"/>
+                        </Grid>
+                    </Border>
+
+                    <Border BorderBrush="Gray" BorderThickness="1" Grid.Row="1" CornerRadius="2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="종료일" Margin="2,2,2,2"/>
+                            <TextBlock Grid.Column="1" Text="{Binding EndDate}" Margin="2,2,2,2"/>
+                        </Grid>
+                    </Border>
+
+                    <Border BorderBrush="Gray" BorderThickness="1" Grid.Row="2" CornerRadius="2">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="담당자" Margin="2,2,2,2"/>
+                            <TextBlock Grid.Column="1" Text="{Binding Assignee}" Margin="2,2,2,2"/>
+                        </Grid>
+                    </Border>
+
+
+                    
+
+                    
+                </Grid>
+
+            </StackPanel>
+        </Border>
+
+        <!-- 좌측 연결점 -->
+        <Ellipse x:Name="LeftConnectionPoint" Width="15" Height="15" Fill="White" 
+                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center" 
+                 Margin="-7.5,0,0,0"
+                 Cursor="Hand">
+            <Ellipse.RenderTransform>
+                <TranslateTransform X="0" Y="0"/>
+            </Ellipse.RenderTransform>
+        </Ellipse>
+
+        <!-- 우측 연결점 -->
+        <Ellipse x:Name="RightConnectionPoint" Width="15" Height="15" Fill="White"
+                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center" 
+                 Margin="0,0,-7.5,0"
+                 Cursor="Hand">
+            <Ellipse.RenderTransform>
+                <TranslateTransform X="0" Y="0"/>
+            </Ellipse.RenderTransform>
+        </Ellipse>
+    </Grid>
+</UserControl>
