@@ -7,7 +7,6 @@ namespace Client.ViewModels
 {
     public class MainWindowViewModel : INotifyPropertyChanged
     {
-        // PropertyChanged 이벤트를 정의하여 뷰에 변경사항을 알립니다.
         public event PropertyChangedEventHandler PropertyChanged;
 
         protected void OnPropertyChanged(string propertyName)
@@ -15,8 +14,7 @@ namespace Client.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        // 노드들의 목록을 저장하는 ObservableCollection입니다.
-        // ObservableCollection은 항목이 추가/삭제될 때 자동으로 UI를 업데이트합니다.
+        // 노드들의 목록을 저장하는 ObservableCollection
         private ObservableCollection<NodeViewModel> _nodes;
         public ObservableCollection<NodeViewModel> Nodes
         {
@@ -28,7 +26,7 @@ namespace Client.ViewModels
             }
         }
 
-        // 현재 선택된 노드를 나타내는 속성입니다.
+        // 현재 선택된 노드를 나타내는 속성
         private NodeViewModel _selectedNode;
         public NodeViewModel SelectedNode
         {
