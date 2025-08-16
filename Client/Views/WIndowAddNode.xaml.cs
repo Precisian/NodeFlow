@@ -1,36 +1,44 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿// WIndowAddNode.xaml.cs
+using Client.ViewModels;
+using Client.Models;
+using System.Collections.ObjectModel;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace Client.Views
 {
-    /// <summary>
-    /// WIndowAddNode.xaml에 대한 상호 작용 논리
-    /// </summary>
     public partial class WIndowAddNode : Window
     {
-        public WIndowAddNode()
+        private AddNodeViewModel viewModel;
+
+        // 추가된 노드 데이터를 외부에 노출할 속성
+        public NodeModel AddedNode { get; private set; }
+
+        public WIndowAddNode(ObservableCollection<NodeProcessType> listCombo)
         {
             InitializeComponent();
 
-            // 콤보박스 항목을 코드에서 동적으로 추가
-            StatusComboBox.Items.Add("계획");
-            StatusComboBox.Items.Add("진행중");
-            StatusComboBox.Items.Add("완료");
-            StatusComboBox.Items.Add("보류");
-            StatusComboBox.Items.Add("진행불가");
-            StatusComboBox.Items.Add("실패");
-            StatusComboBox.SelectedIndex = 0; // 초기값 설정
+            // 뷰모델 인스턴스 생성 및 DataContext 설정
+            viewModel = new AddNodeViewModel(listCombo);
+            this.DataContext = viewModel;
+
+            // 뷰모델의 이벤트 구독
+            viewModel.RequestClose += ViewModel_RequestClose;
+        }
+
+        private void ViewModel_RequestClose()
+        {
+            // 뷰모델로부터 전달받은 NewNode 데이터를 AddedNode에 저장
+            this.AddedNode = viewModel.NewNode;
+            // 창을 닫습니다.
+            this.DialogResult = true;
+            this.Close();
+        }
+
+        // (선택 사항) 취소 버튼을 위한 로직
+        private void CancelButton_Click(object sender, RoutedEventArgs e)
+        {
+            this.DialogResult = false;
+            this.Close();
         }
     }
 }

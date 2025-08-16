@@ -34,8 +34,8 @@ namespace Client.Views
         private void OnRequestViewChange(object sender, EventArgs e)
         {
             // Main Window의 인스턴스를 생성
-            MainWindow mainWindow = new MainWindow();
-
+            MainWindowViewModel viewModel = new MainWindowViewModel();
+            MainWindow mainWindow = new MainWindow(viewModel);
             // 새로운 윈도우를 보여줌
             mainWindow.Show();
 

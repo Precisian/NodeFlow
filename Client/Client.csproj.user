@@ -8,7 +8,13 @@
     <Compile Update="Views\WIndowAddNode.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
+    <Compile Update="Views\WindowAddProperties.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Update="Views\WindowInit.xaml.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Update="Views\WindowNodeList.xaml.cs">
       <SubType>Code</SubType>
     </Compile>
   </ItemGroup>

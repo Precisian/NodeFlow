@@ -1,14 +1,18 @@
-﻿using Client.Models;
+﻿// NodeViewModel.cs
+using Client.Models;
+using System;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using System.Media;
+using System.Windows.Media;
 
 namespace Client.ViewModels
 {
     public class NodeViewModel : INotifyPropertyChanged
     {
-        // 모델 인스턴스를 필드로 가집니다.
-        private NodeModel _nodeModel;
+        // 핵심 데이터인 NodeModel을 속성으로 가집니다.
+        public NodeModel NodeData { get; private set; }
 
         private double _xPosition;
         private double _yPosition;
@@ -25,66 +29,84 @@ namespace Client.ViewModels
         // 노드의 제목 속성입니다.
         public string NodeTitle
         {
-            get => _nodeModel.NodeTitle;
+            get => NodeData.NODE_TITLE;
             set
             {
-                _nodeModel.NodeTitle = value;
-                OnPropertyChanged(nameof(NodeTitle));
+                if (NodeData.NODE_TITLE != value)
+                {
+                    NodeData.NODE_TITLE = value;
+                    OnPropertyChanged(nameof(NodeTitle));
+                }
             }
         }
 
         // 노드의 헤더 색상 속성입니다.
-        public string NodeHeaderColor
+        public Color NodeHeaderColor
         {
-            get => _nodeModel.NodeHeaderColor;
+            get => NodeData.NodeColor;
             set
             {
-                _nodeModel.NodeHeaderColor = value;
-                OnPropertyChanged(nameof(NodeHeaderColor));
+                if (NodeData.NodeColor != value)
+                {
+                    NodeData.NodeColor = value;
+                    OnPropertyChanged(nameof(NodeHeaderColor));
+                }
             }
         }
 
         // 노드의 작업명 속성입니다.
         public string TaskName
         {
-            get => _nodeModel.TaskName;
+            get => NodeData.NODE_TITLE;
             set
             {
-                _nodeModel.TaskName = value;
-                OnPropertyChanged(nameof(TaskName));
+                if (NodeData.NODE_TITLE != value)
+                {
+                    NodeData.NODE_TITLE = value;
+                    OnPropertyChanged(nameof(TaskName));
+                }
             }
         }
 
         // 노드의 시작일 속성입니다.
         public string StartDate
         {
-            get => _nodeModel.StartDate;
+            get => NodeData.DATE_START?.ToString("d");
             set
             {
-                _nodeModel.StartDate = value;
-                OnPropertyChanged(nameof(StartDate));
+                if (DateTime.TryParse(value, out DateTime newDate))
+                {
+                    NodeData.DATE_START = newDate;
+                    OnPropertyChanged(nameof(StartDate));
+                }
             }
         }
 
         // 노드의 종료일 속성입니다.
         public string EndDate
         {
-            get => _nodeModel.EndDate;
+            get => NodeData.DATE_END?.ToString("d");
             set
             {
-                _nodeModel.EndDate = value;
-                OnPropertyChanged(nameof(EndDate));
+                if (DateTime.TryParse(value, out DateTime newDate))
+                {
+                    NodeData.DATE_END = newDate;
+                    OnPropertyChanged(nameof(EndDate));
+                }
             }
         }
 
         // 노드의 담당자 속성입니다.
-        public string Assignee
+        public string Manager
         {
-            get => _nodeModel.Assignee;
+            get => NodeData.ASSIGNEE;
             set
             {
-                _nodeModel.Assignee = value;
-                OnPropertyChanged(nameof(Assignee));
+                if (NodeData.ASSIGNEE != value)
+                {
+                    NodeData.ASSIGNEE = value;
+                    OnPropertyChanged(nameof(Manager));
+                }
             }
         }
 
@@ -94,8 +116,11 @@ namespace Client.ViewModels
             get => _xPosition;
             set
             {
-                _xPosition = value;
-                OnPropertyChanged(nameof(XPosition));
+                if (_xPosition != value)
+                {
+                    _xPosition = value;
+                    OnPropertyChanged(nameof(XPosition));
+                }
             }
         }
 
@@ -105,8 +130,11 @@ namespace Client.ViewModels
             get => _yPosition;
             set
             {
-                _yPosition = value;
-                OnPropertyChanged(nameof(YPosition));
+                if (_yPosition != value)
+                {
+                    _yPosition = value;
+                    OnPropertyChanged(nameof(YPosition));
+                }
             }
         }
 
@@ -125,18 +153,12 @@ namespace Client.ViewModels
         }
 
         // 노드를 제거하는 명령입니다.
-        public ICommand RemoveNodeCommand { get; }
+        // 이 명령은 MainWindowViewModel에 존재해야 하므로 주석 처리 또는 제거 필요
+        // public ICommand RemoveNodeCommand { get; }
 
         public NodeViewModel(NodeModel nodeModel)
         {
-            _nodeModel = nodeModel;
-            // RemoveNodeCommand = new RelayCommand(RemoveNode);
+            this.NodeData = nodeModel; // 생성자에서 NodeData 속성에 모델을 할당
         }
-
-        // 노드를 제거하는 로직. 이 부분은 MainWindowViewModel에서 처리할 수 있습니다.
-        // private void RemoveNode(object parameter)
-        // {
-        //     // 제거 로직 구현
-        // }
     }
 }

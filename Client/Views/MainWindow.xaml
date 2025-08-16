@@ -6,12 +6,7 @@
         xmlns:local="clr-namespace:Client.Views"
         xmlns:vm="clr-namespace:Client.ViewModels"
         mc:Ignorable="d"
-        Title="MainWindow" Height="600" Width="800">
-
-    <!-- 뷰모델을 DataContext로 설정하여 바인딩의 시작점으로 만듭니다. -->
-    <Window.DataContext>
-        <vm:MainWindowViewModel/>
-    </Window.DataContext>
+        Title="{Binding WindowTitle}" Height="600" Width="800">
 
     <DockPanel>
         <Menu DockPanel.Dock="Top">
@@ -66,8 +61,7 @@
                                                 TaskName="{Binding TaskName}"
                                                 StartDate="{Binding StartDate}"
                                                 EndDate="{Binding EndDate}"
-                                                Assignee="{Binding Assignee}"
-                                                NodeTitle="{Binding NodeTitle}"/>
+                                                Assignee="{Binding Assignee}"/>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

@@ -24,10 +24,6 @@ namespace Client.Views
         public static readonly DependencyProperty NodeHeaderColorProperty =
             DependencyProperty.Register("NodeHeaderColor", typeof(Brush), typeof(Node), new PropertyMetadata(Brushes.LightGray));
 
-        // 노드 제목을 바인딩하기 위한 의존성 속성
-        public static readonly DependencyProperty NodeTitleProperty =
-            DependencyProperty.Register("NodeTitle", typeof(string), typeof(Node), new PropertyMetadata("{작업명}"));
-
         // 작업명을 바인딩하기 위한 의존성 속성
         public static readonly DependencyProperty TaskNameProperty =
             DependencyProperty.Register("TaskName", typeof(string), typeof(Node), new PropertyMetadata(string.Empty));
@@ -48,12 +44,6 @@ namespace Client.Views
         {
             get => (Brush)GetValue(NodeHeaderColorProperty);
             set => SetValue(NodeHeaderColorProperty, value);
-        }
-
-        public string NodeTitle
-        {
-            get => (string)GetValue(NodeTitleProperty);
-            set => SetValue(NodeTitleProperty, value);
         }
 
         public string TaskName

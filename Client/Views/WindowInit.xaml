@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Client.Views"
         mc:Ignorable="d"
-        Title="WindowInit" Height="400" Width="500">
+        Title="NodeFlow" Height="400" Width="500">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="10*"/>
@@ -15,6 +15,6 @@
         
         <Image Source="Logo_NodeFlow.png" Grid.Row="0"/>
 
-        <Label Content="Now Loading..." Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
+        <Label Content="{Binding Path= str}"  Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
     </Grid>
 </Window>
