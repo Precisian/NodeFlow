@@ -1,5 +1,6 @@
 ﻿using Client.Models;
 using Client.ViewModels;
+using Client.Views;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -7,15 +8,18 @@ using System.Data.SQLite;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 
+/// <summary>
+/// 프로젝트의 데이터베이스 관련 작업을 관리하는 클래스입니다.
+/// 모든 데이터를 단일 SQLite 파일에 저장하도록 개선되었습니다.
+/// 개별 CRUD 작업을 외부에서 직접 호출할 수 있도록 공개 메서드를 추가했습니다.
+/// </summary>
 public class DBManager
 {
-    // DB 파일명 상수 정의
-    private const string INFO_NODES_DB = "info_nodes.db";
-    private const string INFO_LINKS_DB = "info_links.db";
-    private const string INFO_PROPERTIES_DB = "info_properties.db";
-    private const string INFO_TYPES_DB = "info_types.db";
+    // 단일 DB 파일명 상수 정의
+    private const string PROJECT_DB = "project.db";
     private const string METADATA_FILE = "metadata.json";
 
     private string _tempDirPath;
@@ -25,91 +29,74 @@ public class DBManager
 
     public DBManager()
     {
+        // 프로젝트 임시 저장 디렉토리 생성
         _tempDirPath = Path.Combine(Path.GetTempPath(), "NodeFlowTemp", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_tempDirPath);
         projectMetadata = new ProjectMetadata();
     }
 
-    ~DBManager()
+    /// <summary>
+    /// DB 파일 연결 문자열을 반환합니다.
+    /// </summary>
+    private string GetConnectionString()
     {
-        CleanupTempFiles();
-    }
-
-    private string GetConnectionString(string dbName)
-    {
-        string dbPath = Path.Combine(_tempDirPath, dbName);
+        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
         return $"Data Source={dbPath};Version=3;";
     }
 
-    private string GetCreateTableSql(string dbName)
+    /// <summary>
+    /// 단일 데이터베이스 파일에 모든 테이블을 생성하고 초기화합니다.
+    /// </summary>
+    private void CreateAndOpenDatabase()
     {
-        switch (dbName)
-        {
-            case INFO_NODES_DB:
-                // NodeModel의 필드와 INFO_NODES_DB 테이블 스키마 불일치
-                // NodeModel의 NODE_TITLE, DATE_START 등을 위한 스키마가 필요
-                // 기존 코드를 기반으로 유지
-                return @"CREATE TABLE IF NOT EXISTS INFO_NODES (
-                            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                            NODE_TITLE VARCHAR(50),
-                            POS_X DOUBLE,
-                            POS_Y DOUBLE,
-                            ID_TYPE INT,
-                            DATE_START DATETIME,
-                            DATE_END DATETIME,
-                            ASSIGNEE VARCHAR(50),
-                            PATH VARCHAR(200)
-                        );";
-            case INFO_LINKS_DB:
-                return @"CREATE TABLE IF NOT EXISTS INFO_LINKS (
-                            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                            ID_NODE_SRC INTEGER,
-                            ID_NODE_TGT INTEGER,
-                            CREATED_AT DATETIME,
-                            FOREIGN KEY(ID_NODE_SRC) REFERENCES INFO_NODES(ID) ON DELETE RESTRICT,
-                            FOREIGN KEY(ID_NODE_TGT) REFERENCES INFO_NODES(ID) ON DELETE RESTRICT
-                        );";
-            case INFO_PROPERTIES_DB:
-                // **INFO_PROPERTIES 테이블 스키마 수정:** ID, ID_TYPE, NAME, VALUE를 포함하도록 수정
-                return @"CREATE TABLE IF NOT EXISTS INFO_PROPERTIES (
-                            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                            ID_TYPE INTEGER,
-                            NAME VARCHAR(20),
-                            VALUE TEXT,
-                            FOREIGN KEY(ID_TYPE) REFERENCES INFO_TYPES(ID) ON DELETE RESTRICT
-                        );";
-            case INFO_TYPES_DB:
-                return @"CREATE TABLE IF NOT EXISTS INFO_TYPES (
-                            ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                            TYPE VARCHAR(10),
-                            COLOR_R INTEGER,
-                            COLOR_G INTEGER,
-                            COLOR_B INTEGER
-                        );";
-            default:
-                return string.Empty;
-        }
-    }
-
-    private void CreateAndOpenDatabase(string dbName)
-    {
-        string dbPath = Path.Combine(_tempDirPath, dbName);
+        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
         if (File.Exists(dbPath))
         {
             File.Delete(dbPath);
         }
         SQLiteConnection.CreateFile(dbPath);
-        using (var conn = new SQLiteConnection(GetConnectionString(dbName)))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
-            string sql = GetCreateTableSql(dbName);
-            if (!string.IsNullOrEmpty(sql))
+            string createTablesSql = @"
+                CREATE TABLE IF NOT EXISTS INFO_NODES (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    NODE_TITLE VARCHAR(50),
+                    POS_X DOUBLE,
+                    POS_Y DOUBLE,
+                    ID_TYPE INT,
+                    DATE_START DATETIME,
+                    DATE_END DATETIME,
+                    ASSIGNEE VARCHAR(50),
+                    PATH VARCHAR(200)
+                );
+                CREATE TABLE IF NOT EXISTS INFO_LINKS (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ID_NODE_SRC INTEGER,
+                    ID_NODE_TGT INTEGER,
+                    CREATED_AT DATETIME,
+                    FOREIGN KEY(ID_NODE_SRC) REFERENCES INFO_NODES(ID) ON DELETE CASCADE,
+                    FOREIGN KEY(ID_NODE_TGT) REFERENCES INFO_NODES(ID) ON DELETE CASCADE
+                );
+                CREATE TABLE IF NOT EXISTS INFO_PROPERTIES (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TYPE VARCHAR(10) NOT NULL,
+                    NAME VARCHAR(20),
+                    VALUE TEXT
+                );
+                CREATE TABLE IF NOT EXISTS INFO_TYPES (
+                    ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                    TYPE VARCHAR(10),
+                    COLOR_R INTEGER,
+                    COLOR_G INTEGER,
+                    COLOR_B INTEGER
+                );";
+
+            using (var command = new SQLiteCommand(createTablesSql, conn))
             {
-                using (var command = new SQLiteCommand(sql, conn))
-                {
-                    command.ExecuteNonQuery();
-                }
+                command.ExecuteNonQuery();
             }
+            conn.Close(); // 명시적으로 연결을 닫습니다.
         }
     }
 
@@ -117,11 +104,7 @@ public class DBManager
     {
         CleanupTempFiles();
         Directory.CreateDirectory(_tempDirPath);
-
-        CreateAndOpenDatabase(INFO_NODES_DB);
-        CreateAndOpenDatabase(INFO_LINKS_DB);
-        CreateAndOpenDatabase(INFO_PROPERTIES_DB);
-        CreateAndOpenDatabase(INFO_TYPES_DB);
+        CreateAndOpenDatabase();
         projectMetadata = new ProjectMetadata();
         _projectFilePath = null;
     }
@@ -134,108 +117,190 @@ public class DBManager
 
         try
         {
-            ZipFile.ExtractToDirectory(filePath, _tempDirPath, true);
-        }
-        catch (IOException)
-        {
-            // 압축 해제 중 오류가 발생하면, 임시 폴더를 다시 정리하고 재시도
-            CleanupTempFiles();
-            Directory.CreateDirectory(_tempDirPath);
-            ZipFile.ExtractToDirectory(filePath, _tempDirPath, true);
-        }
+            if (File.Exists(filePath))
+            {
+                ZipFile.ExtractToDirectory(filePath, _tempDirPath, true);
+            }
+            else
+            {
+                throw new FileNotFoundException($"프로젝트 파일이 존재하지 않습니다: {filePath}");
+            }
 
-        string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
-        if (File.Exists(metadataPath))
-        {
-            string json = File.ReadAllText(metadataPath);
-            projectMetadata = JsonSerializer.Deserialize<ProjectMetadata>(json);
+            string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
+            if (File.Exists(metadataPath))
+            {
+                string json = File.ReadAllText(metadataPath, Encoding.UTF8);
+                projectMetadata = JsonSerializer.Deserialize<ProjectMetadata>(json);
+            }
         }
-        else
+        catch (Exception ex)
         {
+            Console.WriteLine($"프로젝트 로드 중 오류 발생: {ex.Message}");
+            CleanupTempFiles();
             projectMetadata = new ProjectMetadata();
         }
     }
 
+    /// <summary>
+    /// 메모리의 모든 컬렉션 데이터를 DB 파일에 저장하고 압축합니다.
+    /// 단일 트랜잭션과 연결을 사용하여 데이터 충돌을 방지합니다.
+    /// </summary>
     public void SaveProject(string filePath, ObservableCollection<NodeViewModel> nodes, ObservableCollection<LinkViewModel> links, ObservableCollection<PropertyItem> properties)
     {
-        // 1. 메모리의 모든 컬렉션 데이터를 DB 파일에 반영합니다.
-        // 기존 데이터 삭제 후 새로운 데이터 삽입 (가장 단순한 방법)
-        DeleteAllNodes();
-        foreach (var nodeVm in nodes)
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
-            AddNode(nodeVm.NodeData); // NodeViewModel에서 NodeModel 추출 후 저장
+            conn.Open();
+            using (var transaction = conn.BeginTransaction())
+            {
+                try
+                {
+                    // 모든 기존 데이터 삭제
+                    DeleteAllData(conn);
+
+                    // 새로운 노드 데이터 저장
+                    string insertNodeSql = @"
+                        INSERT INTO INFO_NODES (NODE_TITLE, ID_TYPE, DATE_START, DATE_END, ASSIGNEE, POS_X, POS_Y, PATH)
+                        VALUES (@nodeTitle, @idType, @dateStart, @dateEnd, @assignee, @posx, @posy, @path);";
+                    using (var cmd = new SQLiteCommand(insertNodeSql, conn))
+                    {
+                        foreach (var nodeVm in nodes)
+                        {
+                            cmd.Parameters.Clear();
+                            cmd.Parameters.AddWithValue("@nodeTitle", nodeVm.NodeData.NODE_TITLE);
+                            cmd.Parameters.AddWithValue("@idType", nodeVm.NodeData.ID_TYPE);
+                            cmd.Parameters.AddWithValue("@dateStart", nodeVm.NodeData.DATE_START?.ToString("yyyy-MM-dd HH:mm:ss"));
+                            cmd.Parameters.AddWithValue("@dateEnd", nodeVm.NodeData.DATE_END?.ToString("yyyy-MM-dd HH:mm:ss"));
+                            cmd.Parameters.AddWithValue("@assignee", nodeVm.NodeData.Assignee);
+                            cmd.Parameters.AddWithValue("@posx", nodeVm.NodeData.XPosition);
+                            cmd.Parameters.AddWithValue("@posy", nodeVm.NodeData.YPosition);
+                            cmd.Parameters.AddWithValue("@path", nodeVm.NodeData.PathCustom);
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // 새로운 링크 데이터 저장
+                    string insertLinkSql = @"
+                        INSERT INTO INFO_LINKS (ID_NODE_SRC, ID_NODE_TGT, CREATED_AT)
+                        VALUES (@idSrc, @idTgt, @createdAt);";
+                    using (var cmd = new SQLiteCommand(insertLinkSql, conn))
+                    {
+                        foreach (var linkVm in links)
+                        {
+                            cmd.Parameters.Clear();
+                            cmd.Parameters.AddWithValue("@idSrc", linkVm.LinkData.ID_NODE_SRC);
+                            cmd.Parameters.AddWithValue("@idTgt", linkVm.LinkData.ID_NODE_TGT);
+                            cmd.Parameters.AddWithValue("@createdAt", linkVm.LinkData.CREATED_AT?.ToString("yyyy-MM-dd HH:mm:ss"));
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    // 새로운 속성 데이터 저장
+                    string insertPropertySql = "INSERT INTO INFO_PROPERTIES (TYPE, NAME, VALUE) VALUES (@type, @name, @value);";
+                    using (var cmd = new SQLiteCommand(insertPropertySql, conn))
+                    {
+                        foreach (var propertyItem in properties)
+                        {
+                            cmd.Parameters.Clear();
+                            cmd.Parameters.AddWithValue("@type", propertyItem.Type);
+                            cmd.Parameters.AddWithValue("@name", propertyItem.Name);
+                            cmd.Parameters.AddWithValue("@value", propertyItem.Value?.ToString());
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+
+                    transaction.Commit();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"프로젝트 저장 실패: {ex.Message}");
+                    transaction.Rollback();
+                    throw;
+                }
+                finally
+                {
+                    conn.Close(); // 트랜잭션 종료 후 명시적으로 연결을 닫습니다.
+                }
+            }
         }
 
-        // (Link와 Property도 동일한 방식으로 처리)
-        DeleteAllLinks();
-        DeleteAllProperties();
-
-        // 2. 메타데이터 업데이트 및 저장합니다.
-        _projectFilePath = filePath;
-        projectMetadata.LastModifiedDate = DateTime.Now;
-
-        string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
-        string json = JsonSerializer.Serialize(projectMetadata);
-        File.WriteAllText(metadataPath, json);
-
-        // 3. 임시 폴더의 모든 내용을 압축하여 최종 파일을 생성합니다.
-        if (File.Exists(filePath))
+        try
         {
-            File.Delete(filePath);
+            // 메타데이터 업데이트 및 저장
+            _projectFilePath = filePath;
+            projectMetadata.LastModifiedDate = DateTime.Now;
+            projectMetadata.ProjectName = Path.GetFileNameWithoutExtension(filePath);
+            string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
+            string json = JsonSerializer.Serialize(projectMetadata);
+            File.WriteAllText(metadataPath, json);
+
+            // 임시 폴더의 모든 내용을 압축
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+            ZipFile.CreateFromDirectory(_tempDirPath, filePath);
         }
-        ZipFile.CreateFromDirectory(_tempDirPath, filePath);
+        catch (Exception ex)
+        {
+            Console.WriteLine($"프로젝트 압축 또는 파일 쓰기 실패: {ex.Message}");
+            throw;
+        }
     }
 
     public void CleanupTempFiles()
     {
-        if (Directory.Exists(_tempDirPath))
+        try
         {
-            Directory.Delete(_tempDirPath, true);
+            if (Directory.Exists(_tempDirPath))
+            {
+                Directory.Delete(_tempDirPath, true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"임시 파일 정리 실패: {ex.Message}");
         }
     }
 
     //---------------------------------------------------------------------------------------------------------------------------------
-    // **INFO_NODES 테이블 CRUD 메서드**
+    // **공개 CRUD 메서드**
 
     /// <summary>
     /// 새로운 노드를 INFO_NODES 테이블에 추가합니다.
     /// </summary>
-    /// <param name="node">추가할 NodeModel 객체</param>
-    /// <returns>DB에서 생성된 ID가 포함된 NodeModel 객체</returns>
-    public NodeModel AddNode(NodeModel node)
+    public int AddNode(NodeModel node)
     {
-        string connString = GetConnectionString(INFO_NODES_DB);
-        using (var conn = new SQLiteConnection(connString))
+        int newId = 0;
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
             string insertSql = @"
-                INSERT INTO INFO_NODES (NODE_TITLE, ID_TYPE, DATE_START, DATE_END, ASSIGNEE)
-                VALUES (@nodeTitle, @idType, @dateStart, @dateEnd, @assignee);
+                INSERT INTO INFO_NODES (NODE_TITLE, ID_TYPE, DATE_START, DATE_END, ASSIGNEE, POS_X, POS_Y)
+                VALUES (@nodeTitle, @idType, @dateStart, @dateEnd, @assignee, @posx, @posy);
                 SELECT last_insert_rowid();";
-
             using (var cmd = new SQLiteCommand(insertSql, conn))
             {
                 cmd.Parameters.AddWithValue("@nodeTitle", node.NODE_TITLE);
-                cmd.Parameters.AddWithValue("@idType", node.ID_NODE);
+                cmd.Parameters.AddWithValue("@idType", node.ID_TYPE);
                 cmd.Parameters.AddWithValue("@dateStart", node.DATE_START?.ToString("yyyy-MM-dd HH:mm:ss"));
                 cmd.Parameters.AddWithValue("@dateEnd", node.DATE_END?.ToString("yyyy-MM-dd HH:mm:ss"));
-                cmd.Parameters.AddWithValue("@assignee", node.ASSIGNEE);
-
-                long newId = (long)cmd.ExecuteScalar();
-                node.ID_NODE = (int)newId;
-                return node;
+                cmd.Parameters.AddWithValue("@assignee", node.Assignee);
+                cmd.Parameters.AddWithValue("@posx", node.XPosition);
+                cmd.Parameters.AddWithValue("@posy", node.YPosition);
+                newId = (int)(long)cmd.ExecuteScalar();
+                Console.WriteLine($"생성된 노드번호 : {newId}");
             }
+            conn.Close();
         }
+        return newId;
     }
 
     /// <summary>
     /// 기존 노드 데이터를 INFO_NODES 테이블에서 수정합니다.
     /// </summary>
-    /// <param name="node">수정할 NodeModel 객체</param>
     public void UpdateNode(NodeModel node)
     {
-        string connString = GetConnectionString(INFO_NODES_DB);
-        using (var conn = new SQLiteConnection(connString))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
             string updateSql = @"
@@ -244,131 +309,133 @@ public class DBManager
                     ID_TYPE = @idType,
                     DATE_START = @dateStart,
                     DATE_END = @dateEnd,
-                    ASSIGNEE = @assignee
+                    ASSIGNEE = @assignee,
+                    POS_X = @posx,
+                    POS_Y = @posy
                 WHERE ID = @id;";
-
             using (var cmd = new SQLiteCommand(updateSql, conn))
             {
                 cmd.Parameters.AddWithValue("@nodeTitle", node.NODE_TITLE);
                 cmd.Parameters.AddWithValue("@idType", node.ID_TYPE);
                 cmd.Parameters.AddWithValue("@dateStart", node.DATE_START?.ToString("yyyy-MM-dd HH:mm:ss"));
                 cmd.Parameters.AddWithValue("@dateEnd", node.DATE_END?.ToString("yyyy-MM-dd HH:mm:ss"));
-                cmd.Parameters.AddWithValue("@assignee", node.ASSIGNEE);
+                cmd.Parameters.AddWithValue("@assignee", node.Assignee);
+                cmd.Parameters.AddWithValue("@posx", node.XPosition);
+                cmd.Parameters.AddWithValue("@posy", node.YPosition);
                 cmd.Parameters.AddWithValue("@id", node.ID_NODE);
                 cmd.ExecuteNonQuery();
             }
+            conn.Close();
         }
     }
 
     /// <summary>
     /// 지정된 ID의 노드를 INFO_NODES 테이블에서 삭제합니다.
     /// </summary>
-    /// <param name="nodeId">삭제할 노드의 ID</param>
     public void DeleteNode(int nodeId)
     {
-        string connString = GetConnectionString(INFO_NODES_DB);
-        using (var conn = new SQLiteConnection(connString))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
             string deleteSql = "DELETE FROM INFO_NODES WHERE ID = @id;";
-
             using (var cmd = new SQLiteCommand(deleteSql, conn))
             {
                 cmd.Parameters.AddWithValue("@id", nodeId);
                 cmd.ExecuteNonQuery();
             }
+            conn.Close();
         }
     }
 
     /// <summary>
-    /// INFO_NODES 테이블의 모든 노드 데이터를 불러옵니다.
+    /// 새로운 링크를 INFO_LINKS 테이블에 추가합니다.
     /// </summary>
-    /// <returns>NodeModel 리스트</returns>
-    public List<NodeModel> GetAllNodes()
+    public void AddLink(LinkModel link)
     {
-        List<NodeModel> nodes = new List<NodeModel>();
-        string connString = GetConnectionString(INFO_NODES_DB);
-
-        if (!File.Exists(Path.Combine(_tempDirPath, INFO_NODES_DB))) return nodes;
-
-        using (var conn = new SQLiteConnection(connString))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
-            string selectSql = "SELECT ID, NODE_TITLE, ID_TYPE, DATE_START, DATE_END, ASSIGNEE FROM INFO_NODES;";
-            using (var cmd = new SQLiteCommand(selectSql, conn))
-            {
-                using (var reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        nodes.Add(new NodeModel
-                        {
-                            ID_NODE = reader.GetInt32(0),
-                            NODE_TITLE = reader.IsDBNull(1) ? null : reader.GetString(1),
-                            ID_TYPE = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
-                            DATE_START = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
-                            DATE_END = reader.IsDBNull(4) ? (DateTime?)null : reader.GetDateTime(4),
-                            ASSIGNEE = reader.IsDBNull(5) ? null : reader.GetString(5)
-                        });
-                    }
-                }
-            }
-        }
-        return nodes;
-    }
-    //---------------------------------------------------------------------------------------------------------------------------------
-
-
-    // **INFO_PROPERTIES 테이블 CRUD 메서드**
-
-    // 속성 아이템 추가
-    public PropertyItem AddPropertyItem(PropertyItem item)
-    {
-        string connString = GetConnectionString(INFO_PROPERTIES_DB);
-        using (var conn = new SQLiteConnection(connString))
-        {
-            conn.Open();
-            string insertSql = "INSERT INTO INFO_PROPERTIES (ID_TYPE, NAME, VALUE) VALUES (@ID_TYPE, @NAME, @VALUE); SELECT last_insert_rowid();";
+            string insertSql = @"
+                INSERT INTO INFO_LINKS (ID_NODE_SRC, ID_NODE_TGT, CREATED_AT)
+                VALUES (@idSrc, @idTgt, @createdAt);";
             using (var cmd = new SQLiteCommand(insertSql, conn))
             {
-                // PropertyItem.Type은 string이지만 DB 스키마는 INTEGER이므로 변환 필요
-                // int.Parse() 또는 Convert.ToInt32() 사용
-                int idType = int.Parse(item.Type);
-                cmd.Parameters.AddWithValue("@ID_TYPE", idType);
-                cmd.Parameters.AddWithValue("@NAME", item.Name);
-                cmd.Parameters.AddWithValue("@VALUE", item.Value?.ToString());
-                long newId = (long)cmd.ExecuteScalar();
-                item.ID = (int)newId;
-                return item;
-            }
-        }
-    }
-
-    // 속성 아이템 수정
-    public void UpdatePropertyItem(PropertyItem item)
-    {
-        string connString = GetConnectionString(INFO_PROPERTIES_DB);
-        using (var conn = new SQLiteConnection(connString))
-        {
-            conn.Open();
-            string updateSql = "UPDATE INFO_PROPERTIES SET ID_TYPE = @ID_TYPE, NAME = @NAME, VALUE = @VALUE WHERE ID = @ID;";
-            using (var cmd = new SQLiteCommand(updateSql, conn))
-            {
-                int idType = int.Parse(item.Type);
-                cmd.Parameters.AddWithValue("@ID_TYPE", idType);
-                cmd.Parameters.AddWithValue("@NAME", item.Name);
-                cmd.Parameters.AddWithValue("@VALUE", item.Value?.ToString());
-                cmd.Parameters.AddWithValue("@ID", item.ID);
+                cmd.Parameters.AddWithValue("@idSrc", link.ID_NODE_SRC);
+                cmd.Parameters.AddWithValue("@idTgt", link.ID_NODE_TGT);
+                cmd.Parameters.AddWithValue("@createdAt", link.CREATED_AT?.ToString("yyyy-MM-dd HH:mm:ss"));
                 cmd.ExecuteNonQuery();
             }
+            conn.Close();
         }
     }
 
-    // 속성 아이템 삭제
+    /// <summary>
+    /// 지정된 ID의 링크를 INFO_LINKS 테이블에서 삭제합니다.
+    /// </summary>
+    public void DeleteLink(int linkId)
+    {
+        using (var conn = new SQLiteConnection(GetConnectionString()))
+        {
+            conn.Open();
+            string deleteSql = "DELETE FROM INFO_LINKS WHERE ID = @id;";
+            using (var cmd = new SQLiteCommand(deleteSql, conn))
+            {
+                cmd.Parameters.AddWithValue("@id", linkId);
+                cmd.ExecuteNonQuery();
+            }
+            conn.Close();
+        }
+    }
+
+    /// <summary>
+    /// 새로운 속성 아이템을 추가합니다.
+    /// </summary>
+    public int AddPropertyItem(PropertyItem item)
+    {
+        int newId = 0;
+        using (var conn = new SQLiteConnection(GetConnectionString()))
+        {
+            conn.Open();
+            string insertSql = "INSERT INTO INFO_PROPERTIES (TYPE, NAME, VALUE) VALUES (@type, @name, @value); SELECT last_insert_rowid();";
+            using (var cmd = new SQLiteCommand(insertSql, conn))
+            {
+                cmd.Parameters.AddWithValue("@type", item.Type);
+                cmd.Parameters.AddWithValue("@name", item.Name);
+                cmd.Parameters.AddWithValue("@value", item.Value?.ToString());
+                newId = (int)(long)cmd.ExecuteScalar();
+            }
+            conn.Close();
+        }
+        return newId;
+    }
+
+    /// <summary>
+    /// 기존 속성 아이템을 수정합니다.
+    /// </summary>
+    public void UpdatePropertyItem(PropertyItem item)
+    {
+        using (var conn = new SQLiteConnection(GetConnectionString()))
+        {
+            conn.Open();
+            string updateSql = "UPDATE INFO_PROPERTIES SET TYPE = @type, NAME = @name, VALUE = @value WHERE ID = @id;";
+            using (var cmd = new SQLiteCommand(updateSql, conn))
+            {
+                cmd.Parameters.AddWithValue("@type", item.Type);
+                cmd.Parameters.AddWithValue("@name", item.Name);
+                cmd.Parameters.AddWithValue("@value", item.Value?.ToString());
+                cmd.Parameters.AddWithValue("@id", item.ID);
+                cmd.ExecuteNonQuery();
+            }
+            conn.Close();
+        }
+    }
+
+    /// <summary>
+    /// 지정된 ID의 속성 아이템을 삭제합니다.
+    /// </summary>
     public void DeletePropertyItem(int propertyId)
     {
-        string connString = GetConnectionString(INFO_PROPERTIES_DB);
-        using (var conn = new SQLiteConnection(connString))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
             string deleteSql = "DELETE FROM INFO_PROPERTIES WHERE ID = @ID;";
@@ -377,21 +444,99 @@ public class DBManager
                 cmd.Parameters.AddWithValue("@ID", propertyId);
                 cmd.ExecuteNonQuery();
             }
+            conn.Close();
         }
     }
 
-    // 모든 속성 아이템 불러오기
-    public ObservableCollection<PropertyItem> LoadProperties()
+    //---------------------------------------------------------------------------------------------------------------------------------
+    // **모든 데이터 로드 메서드**
+
+    /// <summary>
+    /// INFO_NODES 테이블의 모든 노드 데이터를 불러옵니다.
+    /// </summary>
+    public List<NodeModel> GetAllNodes()
     {
-        var properties = new ObservableCollection<PropertyItem>();
-        string connString = GetConnectionString(INFO_PROPERTIES_DB);
+        List<NodeModel> nodes = new List<NodeModel>();
+        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        if (!File.Exists(dbPath)) return nodes;
 
-        if (!File.Exists(Path.Combine(_tempDirPath, INFO_PROPERTIES_DB))) return properties;
-
-        using (var conn = new SQLiteConnection(connString))
+        using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
-            string sql = "SELECT ID, ID_TYPE, NAME, VALUE FROM INFO_PROPERTIES";
+            string selectSql = "SELECT ID, NODE_TITLE, ID_TYPE, DATE_START, DATE_END, ASSIGNEE, POS_X, POS_Y, PATH FROM INFO_NODES;";
+            using (var cmd = new SQLiteCommand(selectSql, conn))
+            {
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var node = new NodeModel
+                        {
+                            ID_NODE = reader.GetInt32(0),
+                            NODE_TITLE = reader.IsDBNull(1) ? null : reader.GetString(1),
+                            ID_TYPE = reader.IsDBNull(2) ? 0 : reader.GetInt32(2),
+                            DATE_START = reader.IsDBNull(3) ? (DateTime?)null : reader.GetDateTime(3),
+                            DATE_END = reader.IsDBNull(4) ? (DateTime?)null : reader.GetDateTime(4),
+                            Assignee = reader.IsDBNull(5) ? null : reader.GetString(5),
+                            XPosition = reader.GetDouble(6),
+                            YPosition = reader.GetDouble(7)
+                        };
+                        nodes.Add(node);
+                    }
+                }
+            }
+            conn.Close();
+        }
+        return nodes;
+    }
+
+    /// <summary>
+    /// INFO_LINKS 테이블의 모든 링크 데이터를 불러옵니다.
+    /// </summary>
+    public List<LinkModel> GetAllLinks()
+    {
+        List<LinkModel> links = new List<LinkModel>();
+        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        if (!File.Exists(dbPath)) return links;
+
+        using (var conn = new SQLiteConnection(GetConnectionString()))
+        {
+            conn.Open();
+            string selectSql = "SELECT ID, ID_NODE_SRC, ID_NODE_TGT, CREATED_AT FROM INFO_LINKS;";
+            using (var cmd = new SQLiteCommand(selectSql, conn))
+            {
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        links.Add(new LinkModel
+                        {
+                            ID = reader.GetInt32(0),
+                            ID_NODE_SRC = reader.GetInt32(1),
+                            ID_NODE_TGT = reader.GetInt32(2),
+                            CREATED_AT = reader.IsDBNull(3) ? (DateTime?)null : DateTime.ParseExact(reader.GetString(3), "yyyy-MM-dd HH:mm:ss", null)
+                        });
+                    }
+                }
+            }
+            conn.Close();
+        }
+        return links;
+    }
+
+    /// <summary>
+    /// INFO_PROPERTIES 테이블의 모든 속성 데이터를 불러옵니다.
+    /// </summary>
+    public List<PropertyItem> GetAllProperties()
+    {
+        List<PropertyItem> properties = new List<PropertyItem>();
+        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        if (!File.Exists(dbPath)) return properties;
+
+        using (var conn = new SQLiteConnection(GetConnectionString()))
+        {
+            conn.Open();
+            string sql = "SELECT ID, TYPE, NAME, VALUE FROM INFO_PROPERTIES";
             using (var cmd = new SQLiteCommand(sql, conn))
             {
                 using (var reader = cmd.ExecuteReader())
@@ -401,99 +546,73 @@ public class DBManager
                         properties.Add(new PropertyItem
                         {
                             ID = reader.GetInt32(0),
-                            Type = reader.GetInt32(1).ToString(), // ID_TYPE은 INTEGER이므로 int로 읽고 string으로 변환
+                            Type = reader.GetString(1),
                             Name = reader.GetString(2),
-                            Value = reader.IsDBNull(3) ? null : reader.GetString(3) // VALUE는 TEXT로 읽음
+                            Value = reader.IsDBNull(3) ? null : reader.GetString(3)
                         });
                     }
                 }
             }
+            conn.Close();
         }
         return properties;
     }
 
-    // (참고) INFO_TYPES 테이블 데이터 로드 메서드
-    public ObservableCollection<NodeProcessType> LoadNodeProcessTypes()
-    {
-        var types = new ObservableCollection<NodeProcessType>();
-        string connString = GetConnectionString(INFO_TYPES_DB);
-
-        if (!File.Exists(Path.Combine(_tempDirPath, INFO_TYPES_DB))) return types;
-
-        using (var conn = new SQLiteConnection(connString))
-        {
-            conn.Open();
-            string sql = "SELECT ID, TYPE, COLOR_R, COLOR_G, COLOR_B FROM INFO_TYPES";
-            using (var cmd = new SQLiteCommand(sql, conn))
-            {
-                using (var reader = cmd.ExecuteReader())
-                {
-                    while (reader.Read())
-                    {
-                        types.Add(new NodeProcessType
-                        {
-                            ID = reader.GetInt32(0),
-                            NAME = reader.GetString(1), // TYPE 컬럼은 NAME으로 매핑
-                            COLOR_R = reader.GetInt32(2),
-                            COLOR_G = reader.GetInt32(3),
-                            COLOR_B = reader.GetInt32(4)
-                        });
-                    }
-                }
-            }
-        }
-        return types;
-    }
-
-    // 테이블 초기화
     /// <summary>
-    /// INFO_NODES 테이블의 모든 노드 데이터를 삭제합니다.
+    /// INFO_TYPES 테이블의 모든 타입 데이터를 불러옵니다.
     /// </summary>
-    private void DeleteAllNodes()
-    {
-        string connString = GetConnectionString(INFO_NODES_DB);
-        using (var conn = new SQLiteConnection(connString))
-        {
-            conn.Open();
-            string deleteSql = "DELETE FROM INFO_NODES;";
-            using (var cmd = new SQLiteCommand(deleteSql, conn))
-            {
-                cmd.ExecuteNonQuery();
-            }
-        }
-    }
+    //public List<TypeItem> GetAllTypes()
+    //{
+    //    List<TypeItem> types = new List<TypeItem>();
+    //    string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+    //    if (!File.Exists(dbPath)) return types;
 
-    /// <summary>
-    /// INFO_LINKS 테이블의 모든 링크 데이터를 삭제합니다.
-    /// </summary>
-    private void DeleteAllLinks()
-    {
-        string connString = GetConnectionString(INFO_LINKS_DB);
-        using (var conn = new SQLiteConnection(connString))
-        {
-            conn.Open();
-            string deleteSql = "DELETE FROM INFO_LINKS;";
-            using (var cmd = new SQLiteCommand(deleteSql, conn))
-            {
-                cmd.ExecuteNonQuery();
-            }
-        }
-    }
+    //    using (var conn = new SQLiteConnection(GetConnectionString()))
+    //    {
+    //        conn.Open();
+    //        string sql = "SELECT ID, TYPE, COLOR_R, COLOR_G, COLOR_B FROM INFO_TYPES";
+    //        using (var cmd = new SQLiteCommand(sql, conn))
+    //        {
+    //            using (var reader = cmd.ExecuteReader())
+    //            {
+    //                while (reader.Read())
+    //                {
+    //                    types.Add(new TypeItem
+    //                    {
+    //                        ID = reader.GetInt32(0),
+    //                        Type = reader.GetString(1),
+    //                        ColorR = reader.GetInt32(2),
+    //                        ColorG = reader.GetInt32(3),
+    //                        ColorB = reader.GetInt32(4)
+    //                    });
+    //                }
+    //            }
+    //        }
+    //        conn.Close();
+    //    }
+    //    return types;
+    //}
 
-    /// <summary>
-    /// INFO_PROPERTIES 테이블의 모든 속성 데이터를 삭제합니다.
-    /// </summary>
-    private void DeleteAllProperties()
+    //---------------------------------------------------------------------------------------------------------------------------------
+    // **내부 메서드**
+    private void DeleteAllData(SQLiteConnection conn)
     {
-        string connString = GetConnectionString(INFO_PROPERTIES_DB);
-        using (var conn = new SQLiteConnection(connString))
+        string deleteSql = "DELETE FROM INFO_NODES; DELETE FROM INFO_LINKS; DELETE FROM INFO_PROPERTIES; DELETE FROM INFO_TYPES;";
+        using (var cmd = new SQLiteCommand(deleteSql, conn))
         {
-            conn.Open();
-            string deleteSql = "DELETE FROM INFO_PROPERTIES;";
-            using (var cmd = new SQLiteCommand(deleteSql, conn))
-            {
-                cmd.ExecuteNonQuery();
-            }
+            cmd.ExecuteNonQuery();
+        }
+
+        // AUTO INCREMENT 초기화: DELETE 문과 동일한 트랜잭션 내에서 실행
+        string resetSql = @"
+            UPDATE sqlite_sequence SET seq = 0 WHERE name = 'INFO_NODES';
+            UPDATE sqlite_sequence SET seq = 0 WHERE name = 'INFO_LINKS';
+            UPDATE sqlite_sequence SET seq = 0 WHERE name = 'INFO_PROPERTIES';
+            UPDATE sqlite_sequence SET seq = 0 WHERE name = 'INFO_TYPES';
+        ";
+        using (var cmd = new SQLiteCommand(resetSql, conn))
+        {
+            cmd.ExecuteNonQuery();
         }
     }
 }

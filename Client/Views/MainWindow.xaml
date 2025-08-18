@@ -17,7 +17,8 @@
                 <MenuItem x:Name="File_Exit" Header="종료" Command="{Binding ExitApplicationCommand}"/>
             </MenuItem>
             <MenuItem Header="Edit">
-                <MenuItem x:Name="Edit_Node_Add" Header="노드 추가" Command="{Binding AddNodeCommand}"/>
+                <!-- 노드 추가 버튼은 이제 Click 이벤트를 사용합니다. -->
+                <MenuItem x:Name="Edit_Node_Add" Header="노드 추가" Click="AddNodeButton_Click" IsEnabled="{Binding IsProjectOpen}"/>
                 <MenuItem x:Name="Edit_Node_Sub" Header="노드 삭제" Command="{Binding RemoveNodeCommand}"/>
                 <MenuItem x:Name="Edit_Node_Manage" Header="노드 목록" Command="{Binding ManageNodesCommand}"/>
             </MenuItem>
@@ -36,41 +37,88 @@
                 <ColumnDefinition Width="3*"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Margin="5" BorderBrush="Gray" BorderThickness="1" CornerRadius="5">
-                <!-- ScrollViewer를 추가하여 캔버스 스크롤 기능을 구현합니다. -->
-                <ScrollViewer x:Name="mainScrollViewer" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+
+            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5">
+                <ScrollViewer Margin="5" Grid.Column="0"
+                              HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden"
+                              Background="Transparent">
                     <Canvas x:Name="mainCanvas"
+                            Background="White"
                             Width="{Binding CanvasWidth}"
-                            Height="{Binding CanvasHeight}">
-                        <!-- 노드들을 Canvas에 바인딩하여 렌더링합니다. -->
-                        <ItemsControl ItemsSource="{Binding Nodes}">
+                            Height="{Binding CanvasHeight}"
+                            MouseLeftButtonDown="Canvas_MouseLeftButtonDown"
+                            MouseLeftButtonUp="Canvas_MouseLeftButtonUp"
+                            MouseMove="MainCanvas_MouseMove"
+                            MouseWheel="MainCanvas_MouseWheel"
+                            MouseRightButtonDown="MainCanvas_MouseRightButtonDown"
+                            MouseRightButtonUp="MainCanvas_MouseRightButtonUp">
+
+                        <!-- 링크 선 그리기 (노드보다 먼저 그려져야 노드 뒤에 가려지지 않음) -->
+                        <ItemsControl ItemsSource="{Binding Links}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <Canvas/>
+                                    <Canvas IsItemsHost="True"/>
                                 </ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Line X1="{Binding StartPoint.X}"
+                                          Y1="{Binding StartPoint.Y}"
+                                          X2="{Binding EndPoint.X}"
+                                          Y2="{Binding EndPoint.Y}"
+                                          Stroke="Black"
+                                          StrokeThickness="2" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- 노드 렌더링 -->
+                        <ItemsControl ItemsSource="{Binding Nodes}">
+                            <!-- 노드들이 Canvas의 좌표를 따르도록 ItemsPanel을 Canvas로 변경합니다. -->
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <Canvas IsItemsHost="True"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
                             <ItemsControl.ItemContainerStyle>
                                 <Style TargetType="ContentPresenter">
+                                    <!-- Canvas.Left와 Canvas.Top을 NodeViewModel의 속성에 직접 바인딩합니다. -->
                                     <Setter Property="Canvas.Left" Value="{Binding XPosition}"/>
                                     <Setter Property="Canvas.Top" Value="{Binding YPosition}"/>
                                 </Style>
                             </ItemsControl.ItemContainerStyle>
+
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <local:Node NodeHeaderColor="{Binding NodeHeaderColor}"
                                                 TaskName="{Binding TaskName}"
                                                 StartDate="{Binding StartDate}"
                                                 EndDate="{Binding EndDate}"
-                                                Assignee="{Binding Assignee}"/>
+                                                Assignee="{Binding Assignee}">
+                                        <!-- 💡 노드 자체에 LayoutTransform 적용 -->
+                                        <local:Node.LayoutTransform>
+                                            <ScaleTransform ScaleX="{Binding NodeScale}" ScaleY="{Binding NodeScale}" />
+                                        </local:Node.LayoutTransform>
+                                    </local:Node>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <Canvas.RenderTransform>
+                            <TransformGroup>
+                                <ScaleTransform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}" />
+                                <TranslateTransform X="{Binding OffsetX}" Y="{Binding OffsetY}" />
+                            </TransformGroup>
+                        </Canvas.RenderTransform>
                     </Canvas>
                 </ScrollViewer>
             </Border>
             <!-- 고정 버튼 층 (캔버스 위에 겹쳐서 위치) -->
             <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="15" Orientation="Horizontal">
-                <Button Content="노드 추가" Command="{Binding AddNodeCommand}" Width="60" Margin="5,0,5,0"/>
+                <!-- 이 버튼의 IsEnabled 속성을 IsProjectOpen에 직접 바인딩하여 활성/비활성 상태를 제어합니다. -->
+                <Button x:Name="AddNodeButton" Content="노드 추가" Click="AddNodeButton_Click" Width="60" Margin="5,0,5,0"
+                        IsEnabled="{Binding IsProjectOpen}"/>
                 <Button Content="뷰 리셋" Command="{Binding ResetViewCommand}" Width="60" Margin="5,0,5,0"/>
             </StackPanel>
             <Grid Grid.Column="1" Margin="5">
@@ -81,8 +129,8 @@
                 <GroupBox x:Name="GroupBox_Basic" Grid.Row="0" Header="기본 속성">
                     <DataGrid ItemsSource="{Binding SelectedNode.BasicProperties}" AutoGenerateColumns="False" CanUserAddRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="형식" Binding="{Binding PropertyType}" Width="*"/>
-                            <DataGridTextColumn Header="내용" Binding="{Binding PropertyValue}" Width="3*"/>
+                            <DataGridTextColumn Header="형식" Binding="{Binding Name}" Width="*"/>
+                            <DataGridTextColumn Header="내용" Binding="{Binding Value}" Width="1.75*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </GroupBox>

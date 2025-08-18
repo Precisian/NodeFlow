@@ -1,6 +1,10 @@
-﻿using System;
+﻿using Client.Models;
+using Client.ViewModels;
+using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -73,6 +77,20 @@ namespace Client.Views
         public Node()
         {
             InitializeComponent();
+        }
+
+        // 노드 전체를 클릭했을 때 호출되는 이벤트 핸들러
+        private void Node_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // DataContext를 NodeViewModel로 캐스팅
+            if (DataContext is NodeViewModel nodeViewModel)
+            {
+                // 뷰모델의 SelectNodeCommand를 실행
+                if (nodeViewModel.SelectNodeCommand.CanExecute(null))
+                {
+                    nodeViewModel.SelectNodeCommand.Execute(null);
+                }
+            }
         }
     }
 }

@@ -1,24 +1,23 @@
 ﻿// NodeViewModel.cs
 using Client.Models;
 using System;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Media;
 using System.Windows;
 using System.Windows.Input;
-using System.Media;
 using System.Windows.Media;
 
 namespace Client.ViewModels
 {
     public class NodeViewModel : INotifyPropertyChanged
     {
-        // 핵심 데이터인 NodeModel을 속성으로 가집니다.
-        public NodeModel NodeData { get; private set; }
-
-        private double _xPosition;
-        private double _yPosition;
         private bool _isSelected;
 
         public event PropertyChangedEventHandler PropertyChanged;
+
+        // DataGrid에 표시될 속성 컬렉션
+        public ObservableCollection<PropertyItem> BasicProperties { get; private set; }
 
         // INotifyPropertyChanged를 구현하는 도우미 메서드
         protected virtual void OnPropertyChanged(string propertyName)
@@ -26,18 +25,45 @@ namespace Client.ViewModels
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
-        // 노드의 제목 속성입니다.
-        public string NodeTitle
+        // 노드 선택 액션을 상위 뷰모델로부터 전달받음
+        private readonly Action<NodeViewModel> _selectAction;
+
+        // 노드 클릭 시 실행될 커맨드
+        public ICommand SelectNodeCommand { get; }
+        public ICommand DragNodeCommand { get; }
+
+        // 추가: 외부에서 전달받을 커맨드
+        public ICommand ConnectNodesCommand { get; set; }
+
+        // 노드 데이터 모델
+        public NodeModel NodeData { get; private set; }
+
+        public NodeViewModel(NodeModel nodeModel, Action<NodeViewModel> selectAction)
         {
-            get => NodeData.NODE_TITLE;
-            set
-            {
-                if (NodeData.NODE_TITLE != value)
-                {
-                    NodeData.NODE_TITLE = value;
-                    OnPropertyChanged(nameof(NodeTitle));
-                }
-            }
+            this.NodeData = nodeModel;
+            this._selectAction = selectAction;
+
+            // SelectNodeCommand 초기화:
+            // 이 커맨드가 실행되면 _selectAction을 호출하고, 현재 인스턴스(this)를 파라미터로 전달합니다.
+            SelectNodeCommand = new RelayCommand(param => _selectAction(this));
+            DragNodeCommand = new RelayCommand(DragNode);
+
+            // 기본 속성들
+            BasicProperties = new ObservableCollection<PropertyItem>();
+            UpdateBasicProperties();
+        }
+
+        public void UpdateBasicProperties()
+        {
+            BasicProperties.Clear();
+
+            // 노드 모델의 데이터를 PropertyItem으로 변환하여 추가합니다.
+            BasicProperties.Add(new PropertyItem { Name = "ID", Value = NodeData.ID_NODE, Type = "Integer" });
+            BasicProperties.Add(new PropertyItem { Name = "작업명", Value = NodeData.NODE_TITLE, Type = "String" });
+            BasicProperties.Add(new PropertyItem { Name = "담당자", Value = NodeData.Assignee, Type = "String" });
+            BasicProperties.Add(new PropertyItem { Name = "시작일", Value = NodeData.DATE_START?.ToShortDateString(), Type = "Date" });
+            BasicProperties.Add(new PropertyItem { Name = "종료일", Value = NodeData.DATE_END?.ToShortDateString(), Type = "Date" });
+            BasicProperties.Add(new PropertyItem { Name = "진행 상태", Value = NodeData.ProcessType?.NAME, Type = "String" });
         }
 
         // 노드의 헤더 색상 속성입니다.
@@ -97,28 +123,28 @@ namespace Client.ViewModels
         }
 
         // 노드의 담당자 속성입니다.
-        public string Manager
+        public string Assignee
         {
-            get => NodeData.ASSIGNEE;
+            get => NodeData.Assignee;
             set
             {
-                if (NodeData.ASSIGNEE != value)
+                if (NodeData.Assignee != value)
                 {
-                    NodeData.ASSIGNEE = value;
-                    OnPropertyChanged(nameof(Manager));
+                    NodeData.Assignee = value;
+                    OnPropertyChanged(nameof(Assignee));
                 }
             }
         }
 
-        // 캔버스 내의 X 좌표입니다. (뷰의 위치와 관련된 속성)
+        // 캔버스 내의 X 좌표입니다. (뷰의 위치와 관련된 속성) 
         public double XPosition
         {
-            get => _xPosition;
+            get => NodeData.XPosition;
             set
             {
-                if (_xPosition != value)
+                if (NodeData.XPosition != value)
                 {
-                    _xPosition = value;
+                    NodeData.XPosition = value;
                     OnPropertyChanged(nameof(XPosition));
                 }
             }
@@ -127,13 +153,42 @@ namespace Client.ViewModels
         // 캔버스 내의 Y 좌표입니다. (뷰의 위치와 관련된 속성)
         public double YPosition
         {
-            get => _yPosition;
+            get => NodeData.YPosition;
             set
             {
-                if (_yPosition != value)
+                if (NodeData.YPosition != value)
                 {
-                    _yPosition = value;
+                    NodeData.YPosition = value;
                     OnPropertyChanged(nameof(YPosition));
+                }
+            }
+        }
+
+        public const double Default_NodeWidth = 150;
+        public const double Default_NodeHeight = 135;
+
+        public double Width
+        {
+            get => NodeData.Width;
+            set
+            {
+                if (NodeData.Width != value)
+                {
+                    NodeData.Width = value;
+                    OnPropertyChanged(nameof(Width));
+                }
+            }
+        }
+
+        public double Height
+        {
+            get => NodeData.Height;
+            set
+            {
+                if (NodeData.Height != value)
+                {
+                    NodeData.Height = value;
+                    OnPropertyChanged(nameof(Height));
                 }
             }
         }
@@ -152,13 +207,27 @@ namespace Client.ViewModels
             }
         }
 
-        // 노드를 제거하는 명령입니다.
-        // 이 명령은 MainWindowViewModel에 존재해야 하므로 주석 처리 또는 제거 필요
-        // public ICommand RemoveNodeCommand { get; }
-
-        public NodeViewModel(NodeModel nodeModel)
+        private void DragNode(object parameter)
         {
-            this.NodeData = nodeModel; // 생성자에서 NodeData 속성에 모델을 할당
+            if(parameter is Point newPosition)
+            {
+                XPosition = newPosition.X;
+                YPosition = newPosition.Y;
+            }
+        }
+
+        private double _nodeScale = 1.0;
+        public double NodeScale
+        {
+            get => _nodeScale;
+            set
+            {
+                if (_nodeScale != value)
+                {
+                    _nodeScale = value;
+                    OnPropertyChanged(nameof(NodeScale));
+                }
+            }
         }
     }
 }

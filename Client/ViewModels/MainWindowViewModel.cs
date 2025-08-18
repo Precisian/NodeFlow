@@ -3,23 +3,95 @@ using Client.Views;
 using Microsoft.Win32;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
+using System.IO;
+using System.Linq;
+using System.Media;
 using System.Windows;
 using System.Windows.Input;
-using System.IO;
-using System.Media;
-using System.Linq;
+using System.Windows.Media;
 
 namespace Client.ViewModels
 {
     public class MainWindowViewModel : INotifyPropertyChanged
     {
+        // 캔버스 사이즈
+        private double _canvasWidth;
+        public double CanvasWidth {
+            get => _canvasWidth;
+            set
+            {
+                if (_canvasWidth != value)
+                {
+                    _canvasWidth = value;
+                    OnPropertyChanged(nameof(CanvasWidth));
+                }
+            }
+        }
+
+        private double _canvasHeight;
+        public double CanvasHeight
+        {
+            get => _canvasHeight;
+            set
+            {
+                if (_canvasHeight != value)
+                {
+                    _canvasHeight = value;
+                    OnPropertyChanged(nameof(CanvasHeight));
+                }
+            }
+        }
+        
+        // 새롭게 추가할 캔버스 변환 관련 속성들
+        private double _scale = 1.0;
+        public double Scale
+        {
+            get => _scale;
+            set
+            {
+                if (_scale != value)
+                {
+                    _scale = value;
+                    OnPropertyChanged(nameof(Scale));
+                }
+            }
+        }
+
+        private double _offsetX = 0;
+        public double OffsetX
+        {
+            get => _offsetX;
+            set
+            {
+                if (_offsetX != value)
+                {
+                    _offsetX = value;
+                    OnPropertyChanged(nameof(OffsetX));
+                }
+            }
+        }
+
+        private double _offsetY = 0;
+        public double OffsetY
+        {
+            get => _offsetY;
+            set
+            {
+                if (_offsetY != value)
+                {
+                    _offsetY = value;
+                    OnPropertyChanged(nameof(OffsetY));
+                }
+            }
+        }
+
         private DBManager _dbManager;
         private string _currentFilePath;
         public ProjectMetadata projectMetadata { get; private set; }
 
         public event PropertyChangedEventHandler PropertyChanged;
 
-        // MVVM 패턴에 맞게 ObservableCollection<NodeViewModel> 사용
         private ObservableCollection<NodeViewModel> _nodes;
         public ObservableCollection<NodeViewModel> Nodes
         {
@@ -31,7 +103,7 @@ namespace Client.ViewModels
             }
         }
 
-        // 현재 선택된 노드를 NodeViewModel로 변경
+        // 선택된 노드를 나타내는 속성
         private NodeViewModel _selectedNode;
         public NodeViewModel SelectedNode
         {
@@ -40,13 +112,25 @@ namespace Client.ViewModels
             {
                 if (_selectedNode != value)
                 {
+                    // 이전 선택된 노드가 있다면 선택 해제
+                    if (_selectedNode != null)
+                    {
+                        _selectedNode.IsSelected = false;
+                    }
+
                     _selectedNode = value;
                     OnPropertyChanged(nameof(SelectedNode));
-                    ((RelayCommand)RemoveNodeCommand).RaiseCanExecuteChanged();
+
+                    // 새롭게 선택된 노드가 있다면 선택 상태로 변경
+                    if (_selectedNode != null)
+                    {
+                        _selectedNode.IsSelected = true;
+                    }
                 }
             }
         }
-        // 링크들의 목록을 저장하는 ObservableCollection
+        private NodeViewModel _startLinkNode;
+
         private ObservableCollection<LinkViewModel> _links;
         public ObservableCollection<LinkViewModel> Links
         {
@@ -58,7 +142,6 @@ namespace Client.ViewModels
             }
         }
 
-        // 속성들의 목록을 저장하는 ObservableCollection
         private ObservableCollection<PropertyItem> _properties;
         public ObservableCollection<PropertyItem> Properties
         {
@@ -102,8 +185,15 @@ namespace Client.ViewModels
                 {
                     _isProjectOpen = value;
                     OnPropertyChanged(nameof(IsProjectOpen));
+
                     ((RelayCommand)SaveProjectCommand).RaiseCanExecuteChanged();
-                    ((RelayCommand)AddNodeCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)AddNodeAtPositionCommand).RaiseCanExecuteChanged(); // 커맨드 이름 변경
+                    ((RelayCommand)RemoveNodeCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)ManageNodesCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)AdjustCanvasSizeCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)ShowPropertiesCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)DeletePropertiesCommand).RaiseCanExecuteChanged();
+                    ((RelayCommand)ResetViewCommand).RaiseCanExecuteChanged();
                 }
             }
         }
@@ -128,7 +218,8 @@ namespace Client.ViewModels
         public ICommand LoadProjectCommand { get; }
         public ICommand SaveProjectCommand { get; }
         public ICommand ExitApplicationCommand { get; }
-        public ICommand AddNodeCommand { get; }
+        // 💡 기존 AddNodeCommand를 제거하고 AddNodeAtPositionCommand로 변경
+        public ICommand AddNodeAtPositionCommand { get; }
         public ICommand RemoveNodeCommand { get; }
         public ICommand ManageNodesCommand { get; }
         public ICommand AdjustCanvasSizeCommand { get; }
@@ -136,13 +227,22 @@ namespace Client.ViewModels
         public ICommand ShowHelpCommand { get; }
         public ICommand DeletePropertiesCommand { get; }
         public ICommand ResetViewCommand { get; }
+        public ICommand ConnectNodesCommand { get; }
 
         public MainWindowViewModel()
         {
+            // 캔버스 사이즈 기본값 초기화
+            this.CanvasWidth = 4000;
+            this.CanvasHeight = 4000;
+
             _dbManager = new DBManager();
             this.projectMetadata = _dbManager.projectMetadata;
 
+            // 데이터 담을 컬렉션 생성
             this.Nodes = new ObservableCollection<NodeViewModel>();
+            this.Links = new ObservableCollection<LinkViewModel>();
+            this.Properties = new ObservableCollection<PropertyItem>();
+
             this.NodeProcessTypes = new ObservableCollection<NodeProcessType> {
                 new NodeProcessType { ID = 1, NAME = "계획", COLOR_R = 128, COLOR_G = 128, COLOR_B = 128 },
                 new NodeProcessType { ID = 2, NAME = "진행중", COLOR_R = 255, COLOR_G = 165, COLOR_B = 0 },
@@ -154,31 +254,66 @@ namespace Client.ViewModels
 
             NewProjectCommand = new RelayCommand(NewProject);
             LoadProjectCommand = new RelayCommand(LoadProject);
-            SaveProjectCommand = new RelayCommand(SaveProject);
+            SaveProjectCommand = new RelayCommand(SaveProject, CanProjectExist);
             ExitApplicationCommand = new RelayCommand(ExitApplication);
-            AddNodeCommand = new RelayCommand(AddNode, CanAddNode);
+            AddNodeAtPositionCommand = new RelayCommand(AddNodeAtPosition, CanProjectExist);
             RemoveNodeCommand = new RelayCommand(RemoveNode, CanRemoveNode);
-            ManageNodesCommand = new RelayCommand(ManageNodes);
-            AdjustCanvasSizeCommand = new RelayCommand(AdjustCanvasSize);
-            ShowPropertiesCommand = new RelayCommand(ShowProperties);
+            ManageNodesCommand = new RelayCommand(ManageNodes, CanProjectExist);
+            AdjustCanvasSizeCommand = new RelayCommand(AdjustCanvasSize, CanProjectExist);
+            ShowPropertiesCommand = new RelayCommand(ShowProperties, CanProjectExist);
             ShowHelpCommand = new RelayCommand(ShowHelp);
-            DeletePropertiesCommand = new RelayCommand(DeleteProperties);
-            ResetViewCommand = new RelayCommand(ResetView);
+            DeletePropertiesCommand = new RelayCommand(DeleteProperties, CanProjectExist);
+            ResetViewCommand = new RelayCommand(ResetView, CanProjectExist);
+            ConnectNodesCommand = new RelayCommand(ConnectNodes);
 
             IsProjectOpen = false;
             UpdateWindowTitle();
+        }
+
+        // 이 메서드는 NodeViewModel의 커맨드로부터 호출됩니다.
+        private void ConnectNodes(object parameter)
+        {
+            if(parameter is NodeViewModel node)
+            {
+                if (_startLinkNode == null)
+                {
+                    // 첫 번째 노드를 선택
+                    _startLinkNode = node;
+                    // 선택 상태를 시각적으로 표시하려면 이 부분에 로직 추가
+                    Console.WriteLine("링크 시작: " + _startLinkNode.NodeData.ID_NODE);
+                }
+                else if (_startLinkNode != node)
+                {
+                    Console.WriteLine("링크되는 노드 : " + node.NodeData.ID_NODE);
+                    // 두 번째 노드를 선택하고 링크 생성
+                    Links.Add(new LinkViewModel(_startLinkNode, node));
+                    
+                    // 링크 생성일 작성
+                    Links.Last().LinkData.CREATED_AT = DateTime.Now;
+                    Console.WriteLine($"링크 생성: {_startLinkNode?.NodeData.ID_NODE} -> {node?.NodeData.ID_NODE}");
+                    _startLinkNode = null; // 링크 생성 후 초기화
+                }
+                else
+                {
+                    // 같은 노드를 다시 클릭하면 링크 모드 취소
+                    _startLinkNode = null;
+                    Console.WriteLine("링크 모드 취소");
+                }
+            }
         }
 
         // 새 프로젝트 생성 로직
         private void NewProject(object parameter)
         {
             this._dbManager.CreateNewProject();
-            this.Nodes.Clear(); // 컬렉션 초기화
+            this.Nodes.Clear();
             this.IsProjectOpen = true;
             this._currentFilePath = null;
             this.projectMetadata.ProjectName = "[제목 없음]";
             Console.WriteLine("[DBManager] 새 프로젝트 생성");
             UpdateWindowTitle();
+
+            ResetView(null);
         }
 
         // 프로젝트 불러오기 로직
@@ -190,22 +325,65 @@ namespace Client.ViewModels
 
             if (openFileDialog.ShowDialog() == true)
             {
+                // 파일 경로 설정 및 DBManager 로드
                 this._currentFilePath = openFileDialog.FileName;
                 this._dbManager.LoadProject(this._currentFilePath);
+                this.projectMetadata = this._dbManager.projectMetadata;
 
-                // DB에서 NodeModel 리스트를 불러와 NodeViewModel 컬렉션으로 변환
+                // 1. 노드 데이터 불러오기 및 뷰 모델에 추가
                 var loadedNodes = _dbManager.GetAllNodes();
+                // 새 ObservableCollection으로 재할당하여 기존 데이터 모두 교체
                 this.Nodes.Clear();
-                foreach (var nodeModel in loadedNodes)
+                double nodeWidth = NodeViewModel.Default_NodeWidth;
+                double nodeHeight = NodeViewModel.Default_NodeHeight;
+
+                foreach (NodeModel nodeModel in loadedNodes)
                 {
-                    this.Nodes.Add(new NodeViewModel(nodeModel));
+                    NodeViewModel nodeViewModel = new NodeViewModel(nodeModel, this.SelectNode);
+
+                    // 노드 크기 설정
+                    nodeViewModel.Width = nodeWidth;
+                    nodeViewModel.Height = nodeHeight;
+
+                    // 노드 진행 상태에 따른 색상 설정
+                    var typeInfo = this.NodeProcessTypes.FirstOrDefault(t => t.ID == nodeModel.ID_TYPE);
+                    if (typeInfo != null)
+                    {
+                        nodeModel.NodeColor = Color.FromRgb(
+                            (byte)typeInfo.COLOR_R,
+                            (byte)typeInfo.COLOR_G,
+                            (byte)typeInfo.COLOR_B
+                        );
+                    }
+                    // 전체 목록에 노드 추가
+                    this.Nodes.Add(nodeViewModel);
+                }
+
+                // 2. 링크 데이터 불러오기 및 뷰 모델에 추가
+                var loadedLinks = _dbManager.GetAllLinks();
+                this.Links.Clear();
+                foreach (var linkModel in loadedLinks)
+                {
+                    // LinkModel의 ID를 사용하여 해당하는 NodeViewModel을 찾습니다.
+                    var startNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_SRC);
+                    var endNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_TGT);
+
+                    Console.WriteLine($"연결번호 : {startNode.NodeData.ID_NODE} - {endNode.NodeData.ID_NODE}");
+                    Console.WriteLine($"시작 노드 : {startNode.NodeData.NODE_TITLE} - {endNode.NodeData.NODE_TITLE}");
+                    this.Links.Add(new LinkViewModel(startNode, endNode));
                 }
 
                 Console.WriteLine($"[DBManager] 파일 불러오기 : {this._currentFilePath}");
+
+                this.IsDirty = false;
                 this.IsProjectOpen = true;
                 UpdateWindowTitle();
+
+                // 뷰 리셋
+                ResetView(null);
             }
         }
+
 
         // 프로젝트 저장 로직
         private void SaveProject(object parameter)
@@ -230,7 +408,7 @@ namespace Client.ViewModels
             {
                 this.projectMetadata.ProjectName = Path.GetFileNameWithoutExtension(this._currentFilePath);
 
-                // DBManager에 데이터 저장 요청
+
                 this._dbManager.SaveProject(this._currentFilePath, this.Nodes, this.Links, this.Properties);
 
                 UpdateWindowTitle();
@@ -274,49 +452,74 @@ namespace Client.ViewModels
             }
         }
 
-        // 노드 추가 로직
-        private void AddNode(object parameter)
+        // 노드 추가
+        private void AddNodeAtPosition(object parameter)
         {
-            WIndowAddNode addNodeView = new WIndowAddNode(this.NodeProcessTypes);
-
-            if (addNodeView.ShowDialog() == true)
+            if (parameter is Point position)
             {
-                var newNodeModel = new NodeModel
+                WIndowAddNode addNodeView = new WIndowAddNode(this.NodeProcessTypes);
+
+                if (addNodeView.ShowDialog() == true)
                 {
-                    NODE_TITLE = addNodeView.AddedNode.NODE_TITLE,
-                    ProcessType = addNodeView.AddedNode.ProcessType,
-                    ID_TYPE =  addNodeView.AddedNode.ID_TYPE,
-                    ASSIGNEE = addNodeView.AddedNode.ASSIGNEE,
-                    DATE_START = addNodeView.AddedNode.DATE_START,
-                    DATE_END = addNodeView.AddedNode.DATE_END,
-                    ID_NODE = addNodeView.AddedNode.ID_NODE,
-                    NodeColor = addNodeView.AddedNode.NodeColor
-                    // 다른 속성들도 설정...
-                };
+                    // 노드의 너비와 높이를 미리 정의하거나 NodeViewModel에서 가져옵니다.
+                    double nodeWidth = NodeViewModel.Default_NodeWidth;
+                    double nodeHeight = NodeViewModel.Default_NodeHeight;
 
-                // DB에 먼저 노드 저장 (ID를 받기 위함)
-                _dbManager.AddNode(newNodeModel);
+                    // 💡 마우스 커서의 좌표를 기준으로 노드 중심을 계산합니다.
+                    // XPosition = 마우스.X - (노드너비 / 2)
+                    // YPosition = 마우스.Y - (노드높이 / 2)
+                    double centeredX = position.X - (nodeWidth / 2);
+                    double centeredY = position.Y - (nodeHeight / 2);
 
-                // NodeModel을 기반으로 NodeViewModel 생성 후 컬렉션에 추가
-                var newNodeViewModel = new NodeViewModel(newNodeModel);
-                Nodes.Add(newNodeViewModel);
+                    var newNodeModel = new NodeModel
+                    {
+                        NODE_TITLE = addNodeView.AddedNode.NODE_TITLE,
+                        ProcessType = addNodeView.AddedNode.ProcessType,
+                        ID_TYPE = addNodeView.AddedNode.ID_TYPE,
+                        Assignee = addNodeView.AddedNode.Assignee,
+                        DATE_START = addNodeView.AddedNode.DATE_START,
+                        DATE_END = addNodeView.AddedNode.DATE_END,
+                        ID_NODE = addNodeView.AddedNode.ID_NODE,
+                        NodeColor = addNodeView.AddedNode.NodeColor,
+                        XPosition = centeredX, // 💡 중앙에 위치한 X 좌표
+                        YPosition = centeredY, // 💡 중앙에 위치한 Y 좌표
+                        Width = nodeWidth,
+                        Height = nodeHeight
+                    };
 
-                // 새로 추가된 노드를 자동으로 선택
-                SelectedNode = newNodeViewModel;
-                IsDirty = true;
+                    // 노드번호 부여
+                    newNodeModel.ID_NODE = _dbManager.AddNode(newNodeModel);
+
+                    var newNodeViewModel = new NodeViewModel(newNodeModel, this.SelectNode);
+
+                    Nodes.Add(newNodeViewModel);
+                    IsDirty = true;
+                }
             }
         }
 
-        // 노드 제거 로직
+        // 노드 삭제 로직
         private void RemoveNode(object parameter)
         {
             if (SelectedNode != null)
             {
-                // DB에서 노드 삭제
-                _dbManager.DeleteNode(SelectedNode.NodeData.ID_NODE);
+                int nodeid = SelectedNode.NodeData.ID_NODE;
 
-                // ViewModel 컬렉션에서 노드 제거
+                // 노드와 연결된 모든 링크를 찾아서 삭제
+                // 💡 LINQ를 사용하여 삭제할 링크를 필터링합니다.
+                var linksToRemove = _links.Where(l => l.StartNode.NodeData.ID_NODE == nodeid || l.EndNode.NodeData.ID_NODE == nodeid).ToList();
+
+                foreach (var link in linksToRemove)
+                {
+                    Links.Remove(link);
+                }
+                // 링크 삭제
+                _dbManager.DeleteLink(nodeid);
+
+                // 노드 삭제
+                _dbManager.DeleteNode(nodeid);
                 Nodes.Remove(SelectedNode);
+
                 SelectedNode = null;
                 this.IsDirty = true;
             }
@@ -327,24 +530,34 @@ namespace Client.ViewModels
             return SelectedNode != null;
         }
 
-        // 나머지 메서드들은 그대로 유지
         private void ManageNodes(object parameter) { /* 노드 목록 관리 로직 */ }
         private void AdjustCanvasSize(object parameter) { /* 캔버스 크기 조절 로직 */ }
         private void ShowProperties(object parameter) { /* 속성 창 표시 로직 */ }
         private void ShowHelp(object parameter) { /* 도움말 표시 로직 */ }
         private void DeleteProperties(object parameter) { /* 속성 삭제 로직 */ }
-        private void ResetView(object parameter) { /* 시점 초기화 */ }
+        // 시점 초기화
+        private void ResetView(object parameter) 
+        {
+            Scale = 1.0;
+            OffsetX = 0;
+            OffsetY = 0;
+        }
 
-        private bool CanAddNode(object parameter)
+        private bool CanProjectExist(object parameter)
         {
             return IsProjectOpen;
         }
 
         private void UpdateWindowTitle()
         {
-            //string projectName = string.IsNullOrEmpty(projectMetadata.ProjectName) ? "[제목 없음]" : projectMetadata.ProjectName;
             string projectName = projectMetadata.ProjectName;
             Console.WriteLine($"프로젝트 이름 : {projectName}");
+
+            if (!IsProjectOpen)
+            {
+                this.WindowTitle = "NodeFlow";
+                return;
+            }
 
             if (!string.IsNullOrEmpty(this._currentFilePath))
             {
@@ -359,6 +572,12 @@ namespace Client.ViewModels
         protected void OnPropertyChanged(string propertyName)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
+        // 노드 클릭 시 호출되어 SelectedNode 속성을 업데이트하는 메서드
+        private void SelectNode(NodeViewModel node)
+        {
+            this.SelectedNode = node;
         }
     }
 }

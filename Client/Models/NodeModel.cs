@@ -97,7 +97,7 @@ namespace Client.Models
 
         // 담당자
         private string _assignee;
-        public string ASSIGNEE
+        public string Assignee
         {
             get => _assignee;
             set
@@ -105,7 +105,7 @@ namespace Client.Models
                 if (_assignee != value)
                 {
                     _assignee = value;
-                    OnPropertyChanged(nameof(ASSIGNEE));
+                    OnPropertyChanged(nameof(Assignee));
                 }
             }
         }
@@ -144,6 +144,77 @@ namespace Client.Models
                 {
                     _nodeColor = value;
                     OnPropertyChanged(nameof(NodeColor));
+                }
+            }
+        }
+
+        private double _xPosition;
+        private double _yPosition;
+        // 캔버스 내의 X 좌표입니다. (뷰의 위치와 관련된 속성)
+        public double XPosition
+        {
+            get => _xPosition;
+            set
+            {
+                if (_xPosition != value)
+                {
+                    _xPosition = value;
+                    OnPropertyChanged(nameof(XPosition));
+                }
+            }
+        }
+
+        // 캔버스 내의 Y 좌표입니다. (뷰의 위치와 관련된 속성)
+        public double YPosition
+        {
+            get => _yPosition;
+            set
+            {
+                if (_yPosition != value)
+                {
+                    _yPosition = value;
+                    OnPropertyChanged(nameof(YPosition));
+                }
+            }
+        }
+
+        private double _width;
+        public double Width
+        {
+            get => _width;
+            set
+            {
+                if(_width != value)
+                {
+                    _width = value;
+                    OnPropertyChanged(nameof(Width));
+                }
+            }
+        }
+
+        private double _height;
+        public double Height
+        {
+            get => _height;
+            set
+            {
+                if(_height != value)
+                {
+                    _height = value;
+                    OnPropertyChanged(nameof(Height));
+                }
+            }
+        }
+        private string _pathCustom;
+        public string PathCustom
+        {
+            get => _pathCustom;
+            set
+            {
+                if (_pathCustom != value)
+                {
+                    _pathCustom = value;
+                    OnPropertyChanged(nameof(PathCustom));
                 }
             }
         }

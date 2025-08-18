@@ -18,6 +18,8 @@ namespace Client.Views
     public partial class WindowInit : Window
     {
         private readonly WindowInitViewModel _viewModel;
+        public MainWindowViewModel mainWindowViewModel;
+
 
         public WindowInit()
         {
@@ -34,8 +36,8 @@ namespace Client.Views
         private void OnRequestViewChange(object sender, EventArgs e)
         {
             // Main Window의 인스턴스를 생성
-            MainWindowViewModel viewModel = new MainWindowViewModel();
-            MainWindow mainWindow = new MainWindow(viewModel);
+            this.mainWindowViewModel = new MainWindowViewModel();
+            MainWindow mainWindow = new MainWindow(this.mainWindowViewModel);
             // 새로운 윈도우를 보여줌
             mainWindow.Show();
 

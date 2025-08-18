@@ -18,7 +18,7 @@ namespace Client.Models
         public int ID_NODE_TGT { get; set; }
 
         // 연결이 생성된 날짜 및 시간
-        public DateTime CREATED_AT { get; set; }
+        public DateTime? CREATED_AT { get; set; }
 
         public LinkModel()
         {

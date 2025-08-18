@@ -70,7 +70,7 @@
                             <ColumnDefinition Width="2*"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="담당자" Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                        <TextBox Grid.Column="1" Text="{Binding NewNode.ASSIGNEE}" Margin="2,2,2,2" BorderBrush="Transparent"/>
+                        <TextBox Grid.Column="1" Text="{Binding NewNode.Assignee}" Margin="2,2,2,2" BorderBrush="Transparent"/>
                     </Grid>
                 </Border>
 

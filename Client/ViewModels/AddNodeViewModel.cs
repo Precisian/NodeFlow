@@ -58,7 +58,18 @@ namespace Client.ViewModels
                     _selectedType = value;
                     OnPropertyChanged(nameof(SelectedType));
 
-                    // 선택된 타입이 변경되면 색상 속성도 업데이트
+                    // 💡 해결 방법: 이 지점에서 NodeModel의 정보를 즉시 업데이트합니다.
+                    if (NewNode != null && value != null)
+                    {
+                        NewNode.ID_TYPE = value.ID;
+                        NewNode.NodeColor = Color.FromRgb(
+                            (byte)value.COLOR_R,
+                            (byte)value.COLOR_G,
+                            (byte)value.COLOR_B
+                        );
+                    }
+
+                    // 기존 UpdateNodeColor() 메서드 호출은 유지하여 SelectedNodeColor를 업데이트
                     UpdateNodeColor();
                 }
             }
@@ -109,7 +120,7 @@ namespace Client.ViewModels
         private void NewNode_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             // NODE_TITLE 또는 ASSIGNEE가 변경되었을 때만 CommandManager에 재평가 요청
-            if (e.PropertyName == nameof(NewNode.NODE_TITLE) || e.PropertyName == nameof(NewNode.ASSIGNEE))
+            if (e.PropertyName == nameof(NewNode.NODE_TITLE) || e.PropertyName == nameof(NewNode.Assignee))
             {
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -129,7 +140,7 @@ namespace Client.ViewModels
             this.NewNode.PropertyChanged += NewNode_PropertyChanged;
 
             // 커맨드 초기화 및 메서드 연결
-            AddNodeCommand = new RelayCommand(OnAddNode, CanAddNode);
+            AddNodeCommand = new RelayCommand(OnAddNode);
         }
         
 
@@ -140,16 +151,8 @@ namespace Client.ViewModels
             NewNode.ID_TYPE = SelectedType.ID;
 
             // 뷰모델을 호출한 쪽에 NewNode 데이터를 전달
-
             // 창 닫기 요청 이벤트 호출
             RequestClose?.Invoke();
-        }
-
-        // 추가 버튼 활성화/비활성화 조건
-        private bool CanAddNode(object parameter)
-        {
-            // 필수 입력 필드(예: NODE_TITLE, ASSIGNEE)가 비어있지 않은지 확인
-            return !string.IsNullOrEmpty(NewNode.NODE_TITLE) && !string.IsNullOrEmpty(NewNode.ASSIGNEE);
         }
     }
 }

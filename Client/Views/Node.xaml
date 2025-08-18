@@ -3,15 +3,19 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:converters="clr-namespace:Client.Converters"
              xmlns:local="clr-namespace:Client.Views"
-             mc:Ignorable="d" Height="135" Width="150">
-    <Grid>
+             mc:Ignorable="d" 
+             d:DesignHeight="135" d:DesignWidth="150"
+             Width="{Binding Width}" Height="{Binding Height}">
+
+    <Grid MouseLeftButtonDown="Node_MouseLeftButtonDown">
         <!-- 노드 컨테이너 -->
         <Border Background="White" BorderBrush="Black" BorderThickness="1" CornerRadius="10">
             <StackPanel Margin="10">
                 <!-- 상단 헤더 (색상 변경 가능) -->
-                <Border CornerRadius="5,5,0,0" Height="20"
-                        Background="{Binding NodeHeaderColor}">
+                <Border Height="20" CornerRadius="5"
+                        Background="{Binding NodeHeaderColor, Converter={StaticResource colorToBrushConverter}}">
                 </Border>
 
                 <!-- 작업명 텍스트 박스 -->
@@ -60,34 +64,28 @@
                             <TextBlock Grid.Column="1" Text="{Binding Assignee}" Margin="2,2,2,2"/>
                         </Grid>
                     </Border>
-
-
-                    
-
-                    
                 </Grid>
-
             </StackPanel>
         </Border>
 
         <!-- 좌측 연결점 -->
-        <Ellipse x:Name="LeftConnectionPoint" Width="15" Height="15" Fill="White" 
-                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center" 
-                 Margin="-7.5,0,0,0"
-                 Cursor="Hand">
-            <Ellipse.RenderTransform>
-                <TranslateTransform X="0" Y="0"/>
-            </Ellipse.RenderTransform>
+        <Ellipse x:Name="InputConnector" Width="15" Height="15" Fill="White"
+                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Left" VerticalAlignment="Center"
+                 Margin="-7.5,0,0,0" Cursor="Hand">
+            <Ellipse.InputBindings>
+                <!-- 마우스 클릭 시 ConnectNodesCommand를 실행하며, 현재 노드를 전달합니다. -->
+                <MouseBinding MouseAction="LeftClick" Command="{Binding ConnectNodesCommand}" CommandParameter="{Binding}" />
+            </Ellipse.InputBindings>
         </Ellipse>
 
         <!-- 우측 연결점 -->
-        <Ellipse x:Name="RightConnectionPoint" Width="15" Height="15" Fill="White"
-                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center" 
-                 Margin="0,0,-7.5,0"
-                 Cursor="Hand">
-            <Ellipse.RenderTransform>
-                <TranslateTransform X="0" Y="0"/>
-            </Ellipse.RenderTransform>
+        <Ellipse x:Name="OutputConnector" Width="15" Height="15" Fill="White"
+                 Stroke="Black" StrokeThickness="1" HorizontalAlignment="Right" VerticalAlignment="Center"
+                 Margin="0,0,-7.5,0" Cursor="Hand">
+            <Ellipse.InputBindings>
+                <!-- 마우스 클릭 시 ConnectNodesCommand를 실행하며, 현재 노드를 전달합니다. -->
+                <MouseBinding MouseAction="LeftClick" Command="{Binding ConnectNodesCommand}" CommandParameter="{Binding}" />
+            </Ellipse.InputBindings>
         </Ellipse>
     </Grid>
 </UserControl>
