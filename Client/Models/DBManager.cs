@@ -372,17 +372,38 @@ public class DBManager
     /// <summary>
     /// 지정된 ID의 링크를 INFO_LINKS 테이블에서 삭제합니다.
     /// </summary>
-    public void DeleteLink(int linkId)
+    public void DeleteLink(int nodeId)
     {
         using (var conn = new SQLiteConnection(GetConnectionString()))
         {
             conn.Open();
-            string deleteSql = "DELETE FROM INFO_LINKS WHERE ID = @id;";
+
+            // 1. 삭제 전 행(row) 수 확인 및 출력
+            string countSqlBefore = "SELECT COUNT(*) FROM INFO_LINKS WHERE ID_NODE_SRC = @nodeId OR ID_NODE_TGT = @nodeId;";
+            using (var cmdCountBefore = new SQLiteCommand(countSqlBefore, conn))
+            {
+                cmdCountBefore.Parameters.AddWithValue("@nodeId", nodeId);
+                long countBefore = (long)cmdCountBefore.ExecuteScalar();
+                Console.WriteLine($"[DBManager] 삭제 전, 연결된 링크 수: {countBefore}개");
+            }
+
+            // 2. 링크 삭제
+            string deleteSql = "DELETE FROM INFO_LINKS WHERE ID_NODE_SRC = @nodeId OR ID_NODE_TGT = @nodeId;";
             using (var cmd = new SQLiteCommand(deleteSql, conn))
             {
-                cmd.Parameters.AddWithValue("@id", linkId);
-                cmd.ExecuteNonQuery();
+                cmd.Parameters.AddWithValue("@nodeId", nodeId);
+                int rowsAffected = cmd.ExecuteNonQuery(); // 삭제된 행의 수를 반환합니다.
+                Console.WriteLine($"[DBManager] 총 {rowsAffected}개의 링크가 삭제되었습니다.");
             }
+
+            // 3. 삭제 후 전체 행(row) 수 확인 및 출력
+            string countSqlAfter = "SELECT COUNT(*) FROM INFO_LINKS;";
+            using (var cmdCountAfter = new SQLiteCommand(countSqlAfter, conn))
+            {
+                long countAfter = (long)cmdCountAfter.ExecuteScalar();
+                Console.WriteLine($"[DBManager] 삭제 후, 총 링크 수: {countAfter}개");
+            }
+
             conn.Close();
         }
     }

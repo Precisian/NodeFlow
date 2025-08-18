@@ -119,6 +119,7 @@
                 <!-- 이 버튼의 IsEnabled 속성을 IsProjectOpen에 직접 바인딩하여 활성/비활성 상태를 제어합니다. -->
                 <Button x:Name="AddNodeButton" Content="노드 추가" Click="AddNodeButton_Click" Width="60" Margin="5,0,5,0"
                         IsEnabled="{Binding IsProjectOpen}"/>
+                <Button Content="링크 삭제" Command="{Binding DeleteLinkSelectedNodeCommand}" IsEnabled="{Binding IsNodeSelected}" Width="60" Margin="5,0,5,0"/>
                 <Button Content="뷰 리셋" Command="{Binding ResetViewCommand}" Width="60" Margin="5,0,5,0"/>
             </StackPanel>
             <Grid Grid.Column="1" Margin="5">

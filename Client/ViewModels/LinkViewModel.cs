@@ -33,7 +33,6 @@ namespace Client.ViewModels
                     if (_startNode != null)
                     {
                         _startNode.PropertyChanged += OnNodePositionChanged;
-                        UpdatePoints();
                     }
                 }
             }
@@ -50,6 +49,7 @@ namespace Client.ViewModels
                     if (_endNode != null)
                     {
                         _endNode.PropertyChanged -= OnNodePositionChanged;
+
                     }
 
                     _endNode = value;
@@ -57,7 +57,6 @@ namespace Client.ViewModels
                     if (_endNode != null)
                     {
                         _endNode.PropertyChanged += OnNodePositionChanged;
-                        UpdatePoints();
                     }
                 }
             }
@@ -90,6 +89,8 @@ namespace Client.ViewModels
                 }
             }
         }
+
+        //public Line
 
         public LinkViewModel(NodeViewModel startNode, NodeViewModel endNode)
         {

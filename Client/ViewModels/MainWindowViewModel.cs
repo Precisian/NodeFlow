@@ -139,7 +139,7 @@ namespace Client.ViewModels
             {
                 _links = value;
                 OnPropertyChanged(nameof(Links));
-            }
+            }   
         }
 
         private ObservableCollection<PropertyItem> _properties;
@@ -198,6 +198,20 @@ namespace Client.ViewModels
             }
         }
 
+        private bool _isNodeSelected;
+        public bool IsNodeSelected
+        {
+            get => _isNodeSelected;
+            set
+            {
+                if (_isNodeSelected != value)
+                {
+                    _isNodeSelected = value;
+                    OnPropertyChanged(nameof(IsNodeSelected));
+                }
+            }
+        }
+
         private string _windowTitle;
         public string WindowTitle
         {
@@ -228,6 +242,7 @@ namespace Client.ViewModels
         public ICommand DeletePropertiesCommand { get; }
         public ICommand ResetViewCommand { get; }
         public ICommand ConnectNodesCommand { get; }
+        public ICommand DeleteLinkSelectedNodeCommand { get; }
 
         public MainWindowViewModel()
         {
@@ -235,13 +250,13 @@ namespace Client.ViewModels
             this.CanvasWidth = 4000;
             this.CanvasHeight = 4000;
 
-            _dbManager = new DBManager();
-            this.projectMetadata = _dbManager.projectMetadata;
-
             // 데이터 담을 컬렉션 생성
             this.Nodes = new ObservableCollection<NodeViewModel>();
             this.Links = new ObservableCollection<LinkViewModel>();
             this.Properties = new ObservableCollection<PropertyItem>();
+
+            _dbManager = new DBManager();
+            this.projectMetadata = _dbManager.projectMetadata;
 
             this.NodeProcessTypes = new ObservableCollection<NodeProcessType> {
                 new NodeProcessType { ID = 1, NAME = "계획", COLOR_R = 128, COLOR_G = 128, COLOR_B = 128 },
@@ -265,6 +280,8 @@ namespace Client.ViewModels
             DeletePropertiesCommand = new RelayCommand(DeleteProperties, CanProjectExist);
             ResetViewCommand = new RelayCommand(ResetView, CanProjectExist);
             ConnectNodesCommand = new RelayCommand(ConnectNodes);
+            DeleteLinkSelectedNodeCommand = new RelayCommand(DeleteLinksForSelectedNode, CanRemoveNode);
+
 
             IsProjectOpen = false;
             UpdateWindowTitle();
@@ -273,31 +290,42 @@ namespace Client.ViewModels
         // 이 메서드는 NodeViewModel의 커맨드로부터 호출됩니다.
         private void ConnectNodes(object parameter)
         {
-            if(parameter is NodeViewModel node)
+            if (parameter is NodeViewModel node)
             {
                 if (_startLinkNode == null)
                 {
-                    // 첫 번째 노드를 선택
                     _startLinkNode = node;
-                    // 선택 상태를 시각적으로 표시하려면 이 부분에 로직 추가
-                    Console.WriteLine("링크 시작: " + _startLinkNode.NodeData.ID_NODE);
                 }
                 else if (_startLinkNode != node)
                 {
-                    Console.WriteLine("링크되는 노드 : " + node.NodeData.ID_NODE);
-                    // 두 번째 노드를 선택하고 링크 생성
-                    Links.Add(new LinkViewModel(_startLinkNode, node));
-                    
-                    // 링크 생성일 작성
-                    Links.Last().LinkData.CREATED_AT = DateTime.Now;
-                    Console.WriteLine($"링크 생성: {_startLinkNode?.NodeData.ID_NODE} -> {node?.NodeData.ID_NODE}");
-                    _startLinkNode = null; // 링크 생성 후 초기화
+                    // 이미 링크가 존재하는지 확인하는 로직 추가
+                    var existingLink = Links.FirstOrDefault(l =>
+                        (l.StartNode == _startLinkNode && l.EndNode == node) ||
+                        (l.StartNode == node && l.EndNode == _startLinkNode));
+
+                    // 이미 같은 링크가 존재하면 새로 만들지 않습니다.
+                    if (existingLink == null)
+                    {
+                        Links.Add(new LinkViewModel(_startLinkNode, node));
+                        Console.WriteLine($"링크 생성: {_startLinkNode?.NodeData.ID_NODE} -> {node?.NodeData.ID_NODE}");
+
+                        LinkModel newLink = new LinkModel
+                        {
+                            ID_NODE_SRC = _startLinkNode.NodeData.ID_NODE,
+                            ID_NODE_TGT = node.NodeData.ID_NODE
+                        };
+                        _dbManager.AddLink(newLink);
+                    }
+                    else
+                    {
+                        Console.WriteLine("이미 존재하는 링크입니다.");
+                    }
+
+                    _startLinkNode = null;
                 }
                 else
                 {
-                    // 같은 노드를 다시 클릭하면 링크 모드 취소
                     _startLinkNode = null;
-                    Console.WriteLine("링크 모드 취소");
                 }
             }
         }
@@ -306,6 +334,7 @@ namespace Client.ViewModels
         private void NewProject(object parameter)
         {
             this._dbManager.CreateNewProject();
+
             this.Nodes.Clear();
             this.IsProjectOpen = true;
             this._currentFilePath = null;
@@ -367,9 +396,6 @@ namespace Client.ViewModels
                     // LinkModel의 ID를 사용하여 해당하는 NodeViewModel을 찾습니다.
                     var startNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_SRC);
                     var endNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_TGT);
-
-                    Console.WriteLine($"연결번호 : {startNode.NodeData.ID_NODE} - {endNode.NodeData.ID_NODE}");
-                    Console.WriteLine($"시작 노드 : {startNode.NodeData.NODE_TITLE} - {endNode.NodeData.NODE_TITLE}");
                     this.Links.Add(new LinkViewModel(startNode, endNode));
                 }
 
@@ -543,6 +569,32 @@ namespace Client.ViewModels
             OffsetY = 0;
         }
 
+        // 선택한 노드의 모든 링크 삭제
+        private void DeleteLinksForSelectedNode(object parameter)
+        {
+            if (SelectedNode != null)
+            {
+                int nodeId = SelectedNode.NodeData.ID_NODE;
+
+                // 1. 뷰모델의 Links 컬렉션에서 삭제할 링크들을 먼저 찾습니다.
+                var linksToRemove = Links.Where(l =>
+                    l.StartNode.NodeData.ID_NODE == nodeId || l.EndNode.NodeData.ID_NODE == nodeId
+                ).ToList();
+
+                // 2. 데이터베이스에서 해당 노드와 관련된 모든 링크를 삭제합니다.
+                _dbManager.DeleteLink(nodeId);
+
+                // 3. 뷰모델의 ObservableCollection에서 해당 링크들을 제거합니다.
+                // 이 과정이 UI 갱신을 트리거합니다.
+                foreach (var link in linksToRemove)
+                {
+                    Links.Remove(link);
+                }
+
+                this.IsDirty = true;
+            }
+        }
+
         private bool CanProjectExist(object parameter)
         {
             return IsProjectOpen;
@@ -578,6 +630,7 @@ namespace Client.ViewModels
         private void SelectNode(NodeViewModel node)
         {
             this.SelectedNode = node;
+            IsNodeSelected = node == null ? false : true;
         }
     }
 }
