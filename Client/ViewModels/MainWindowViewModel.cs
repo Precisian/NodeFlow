@@ -295,6 +295,7 @@ namespace Client.ViewModels
                 if (_startLinkNode == null)
                 {
                     _startLinkNode = node;
+                    Console.WriteLine("링크 시작 : " + _startLinkNode.NodeData.ID_NODE);
                 }
                 else if (_startLinkNode != node)
                 {
@@ -309,12 +310,10 @@ namespace Client.ViewModels
                         Links.Add(new LinkViewModel(_startLinkNode, node));
                         Console.WriteLine($"링크 생성: {_startLinkNode?.NodeData.ID_NODE} -> {node?.NodeData.ID_NODE}");
 
-                        LinkModel newLink = new LinkModel
-                        {
-                            ID_NODE_SRC = _startLinkNode.NodeData.ID_NODE,
-                            ID_NODE_TGT = node.NodeData.ID_NODE
-                        };
-                        _dbManager.AddLink(newLink);
+                        Links.Last().LinkData.ID_NODE_SRC = _startLinkNode.NodeData.ID_NODE;
+                        Links.Last().LinkData.ID_NODE_TGT = node.NodeData.ID_NODE;
+
+                        _dbManager.AddLink(Links.Last().LinkData);
                     }
                     else
                     {
@@ -368,20 +367,21 @@ namespace Client.ViewModels
 
                 foreach (NodeModel nodeModel in loadedNodes)
                 {
-                    NodeViewModel nodeViewModel = new NodeViewModel(nodeModel, this.SelectNode);
+                    NodeViewModel nodeViewModel = new NodeViewModel(nodeModel, this.SelectNode, this.NodeProcessTypes);
 
                     // 노드 크기 설정
                     nodeViewModel.Width = nodeWidth;
                     nodeViewModel.Height = nodeHeight;
-
-                    // 노드 진행 상태에 따른 색상 설정
-                    var typeInfo = this.NodeProcessTypes.FirstOrDefault(t => t.ID == nodeModel.ID_TYPE);
-                    if (typeInfo != null)
+                    var processType = this.NodeProcessTypes.FirstOrDefault(t => t.ID == nodeModel.ID_TYPE);
+                    if (processType != null)
                     {
+                        nodeModel.ProcessType = processType;
+
+                        // 💡 노드 헤더 색상도 NodeProcessType의 COLOR_R,G,B 값으로 설정합니다.
                         nodeModel.NodeColor = Color.FromRgb(
-                            (byte)typeInfo.COLOR_R,
-                            (byte)typeInfo.COLOR_G,
-                            (byte)typeInfo.COLOR_B
+                            (byte)processType.COLOR_R,
+                            (byte)processType.COLOR_G,
+                            (byte)processType.COLOR_B
                         );
                     }
                     // 전체 목록에 노드 추가
@@ -396,8 +396,16 @@ namespace Client.ViewModels
                     // LinkModel의 ID를 사용하여 해당하는 NodeViewModel을 찾습니다.
                     var startNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_SRC);
                     var endNode = this.Nodes.FirstOrDefault(n => n.NodeData.ID_NODE == linkModel.ID_NODE_TGT);
-                    this.Links.Add(new LinkViewModel(startNode, endNode));
+
+                    LinkViewModel newLink = new LinkViewModel(startNode, endNode);
+                    newLink.LinkData.ID_NODE_SRC = linkModel.ID_NODE_SRC;
+                    newLink.LinkData.ID_NODE_TGT = linkModel.ID_NODE_TGT;
+
+                    this.Links.Add(newLink);
                 }
+
+                // 3. 프로퍼티 데이터 불러오기 및 뷰 모델에 추가
+                var loadedProperties = _dbManager.GetAllProperties();
 
                 Console.WriteLine($"[DBManager] 파일 불러오기 : {this._currentFilePath}");
 
@@ -483,6 +491,7 @@ namespace Client.ViewModels
         {
             if (parameter is Point position)
             {
+                // AddNode 창을 띄울 때 MainWindowViewModel의 NodeProcessTypes를 전달
                 WIndowAddNode addNodeView = new WIndowAddNode(this.NodeProcessTypes);
 
                 if (addNodeView.ShowDialog() == true)
@@ -492,10 +501,11 @@ namespace Client.ViewModels
                     double nodeHeight = NodeViewModel.Default_NodeHeight;
 
                     // 💡 마우스 커서의 좌표를 기준으로 노드 중심을 계산합니다.
-                    // XPosition = 마우스.X - (노드너비 / 2)
-                    // YPosition = 마우스.Y - (노드높이 / 2)
                     double centeredX = position.X - (nodeWidth / 2);
                     double centeredY = position.Y - (nodeHeight / 2);
+
+                    // 💡 WIndowAddNode에서 반환된 객체를 이용해 새 NodeModel을 생성합니다.
+                    //    ProcessType 객체가 이미 선택되어 있으므로 그대로 사용합니다.
 
                     var newNodeModel = new NodeModel
                     {
@@ -513,10 +523,11 @@ namespace Client.ViewModels
                         Height = nodeHeight
                     };
 
-                    // 노드번호 부여
+                    // 노드 번호 부여 및 DB에 추가
                     newNodeModel.ID_NODE = _dbManager.AddNode(newNodeModel);
 
-                    var newNodeViewModel = new NodeViewModel(newNodeModel, this.SelectNode);
+                    // 💡 올바르게 초기화된 NodeModel을 NodeViewModel 생성자에 전달합니다.
+                    var newNodeViewModel = new NodeViewModel(newNodeModel, this.SelectNode, this.NodeProcessTypes);
 
                     Nodes.Add(newNodeViewModel);
                     IsDirty = true;

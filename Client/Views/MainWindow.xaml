@@ -17,7 +17,6 @@
                 <MenuItem x:Name="File_Exit" Header="종료" Command="{Binding ExitApplicationCommand}"/>
             </MenuItem>
             <MenuItem Header="Edit">
-                <!-- 노드 추가 버튼은 이제 Click 이벤트를 사용합니다. -->
                 <MenuItem x:Name="Edit_Node_Add" Header="노드 추가" Click="AddNodeButton_Click" IsEnabled="{Binding IsProjectOpen}"/>
                 <MenuItem x:Name="Edit_Node_Sub" Header="노드 삭제" Command="{Binding RemoveNodeCommand}"/>
                 <MenuItem x:Name="Edit_Node_Manage" Header="노드 목록" Command="{Binding ManageNodesCommand}"/>
@@ -53,7 +52,6 @@
                             MouseRightButtonDown="MainCanvas_MouseRightButtonDown"
                             MouseRightButtonUp="MainCanvas_MouseRightButtonUp">
 
-                        <!-- 링크 선 그리기 (노드보다 먼저 그려져야 노드 뒤에 가려지지 않음) -->
                         <ItemsControl ItemsSource="{Binding Links}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -72,9 +70,7 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <!-- 노드 렌더링 -->
                         <ItemsControl ItemsSource="{Binding Nodes}">
-                            <!-- 노드들이 Canvas의 좌표를 따르도록 ItemsPanel을 Canvas로 변경합니다. -->
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <Canvas IsItemsHost="True"/>
@@ -83,7 +79,6 @@
 
                             <ItemsControl.ItemContainerStyle>
                                 <Style TargetType="ContentPresenter">
-                                    <!-- Canvas.Left와 Canvas.Top을 NodeViewModel의 속성에 직접 바인딩합니다. -->
                                     <Setter Property="Canvas.Left" Value="{Binding XPosition}"/>
                                     <Setter Property="Canvas.Top" Value="{Binding YPosition}"/>
                                 </Style>
@@ -96,7 +91,6 @@
                                                 StartDate="{Binding StartDate}"
                                                 EndDate="{Binding EndDate}"
                                                 Assignee="{Binding Assignee}">
-                                        <!-- 💡 노드 자체에 LayoutTransform 적용 -->
                                         <local:Node.LayoutTransform>
                                             <ScaleTransform ScaleX="{Binding NodeScale}" ScaleY="{Binding NodeScale}" />
                                         </local:Node.LayoutTransform>
@@ -114,9 +108,7 @@
                     </Canvas>
                 </ScrollViewer>
             </Border>
-            <!-- 고정 버튼 층 (캔버스 위에 겹쳐서 위치) -->
             <StackPanel Grid.Column="0" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="15" Orientation="Horizontal">
-                <!-- 이 버튼의 IsEnabled 속성을 IsProjectOpen에 직접 바인딩하여 활성/비활성 상태를 제어합니다. -->
                 <Button x:Name="AddNodeButton" Content="노드 추가" Click="AddNodeButton_Click" Width="60" Margin="5,0,5,0"
                         IsEnabled="{Binding IsProjectOpen}"/>
                 <Button Content="링크 삭제" Command="{Binding DeleteLinkSelectedNodeCommand}" IsEnabled="{Binding IsNodeSelected}" Width="60" Margin="5,0,5,0"/>
@@ -127,11 +119,113 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="2*"/>
                 </Grid.RowDefinitions>
-                <GroupBox x:Name="GroupBox_Basic" Grid.Row="0" Header="기본 속성">
-                    <DataGrid ItemsSource="{Binding SelectedNode.BasicProperties}" AutoGenerateColumns="False" CanUserAddRows="False">
+                <GroupBox x:Name="GroupBox_Basic" Grid.Row="0" Header="기본 속성"
+          DataContext="{Binding SelectedNode}">
+                    <DataGrid ItemsSource="{Binding BasicProperties}" AutoGenerateColumns="False" CanUserAddRows="False">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="형식" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="내용" Binding="{Binding Value}" Width="1.75*"/>
+
+                            <DataGridTemplateColumn Header="내용" Width="1.75*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ContentControl Content="{Binding}">
+                                            <ContentControl.Style>
+                                                <Style TargetType="ContentControl">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Type}" Value="Date">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding Value, StringFormat='yyyy-MM-dd'}"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="NodeProcessType">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding Value.NAME}"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="String">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding Value}"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="Integer">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding Value}"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ContentControl.Style>
+                                        </ContentControl>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ContentControl Content="{Binding}">
+                                            <ContentControl.Style>
+                                                <Style TargetType="ContentControl">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Type}" Value="Date">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <DatePicker SelectedDate="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="NodeProcessType">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <ComboBox
+                                                            ItemsSource="{Binding Path=DataContext.NodeProcessTypes, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type Window}}}"
+                                                            DisplayMemberPath="NAME"
+                                                            SelectedItem="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged }"/>
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="String">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBox Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Type}" Value="Integer">
+                                                            <Setter Property="ContentTemplate">
+                                                                <Setter.Value>
+                                                                    <DataTemplate>
+                                                                        <TextBlock Text="{Binding Value}" IsEnabled="False" />
+                                                                    </DataTemplate>
+                                                                </Setter.Value>
+                                                            </Setter>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ContentControl.Style>
+                                        </ContentControl>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </GroupBox>

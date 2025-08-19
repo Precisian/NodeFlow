@@ -148,7 +148,7 @@ namespace Client.ViewModels
         private void OnAddNode(object parameter)
         {
             // 선택된 타입의 ID를 NewNode에 할당
-            NewNode.ID_TYPE = SelectedType.ID;
+            NewNode.ProcessType = SelectedType;
 
             // 뷰모델을 호출한 쪽에 NewNode 데이터를 전달
             // 창 닫기 요청 이벤트 호출

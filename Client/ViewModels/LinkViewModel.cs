@@ -91,7 +91,6 @@ namespace Client.ViewModels
         }
 
         //public Line
-
         public LinkViewModel(NodeViewModel startNode, NodeViewModel endNode)
         {
             LinkData = new LinkModel();

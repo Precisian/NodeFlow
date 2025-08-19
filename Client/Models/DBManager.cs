@@ -8,8 +8,10 @@ using System.Data.SQLite;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using System.Text.Json;
+using System.Windows.Shapes;
 
 /// <summary>
 /// 프로젝트의 데이터베이스 관련 작업을 관리하는 클래스입니다.
@@ -30,7 +32,7 @@ public class DBManager
     public DBManager()
     {
         // 프로젝트 임시 저장 디렉토리 생성
-        _tempDirPath = Path.Combine(Path.GetTempPath(), "NodeFlowTemp", Guid.NewGuid().ToString());
+        _tempDirPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "NodeFlowTemp", Guid.NewGuid().ToString());
         Directory.CreateDirectory(_tempDirPath);
         projectMetadata = new ProjectMetadata();
     }
@@ -40,7 +42,7 @@ public class DBManager
     /// </summary>
     private string GetConnectionString()
     {
-        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        string dbPath = System.IO.Path.Combine(_tempDirPath, PROJECT_DB);
         return $"Data Source={dbPath};Version=3;";
     }
 
@@ -49,7 +51,7 @@ public class DBManager
     /// </summary>
     private void CreateAndOpenDatabase()
     {
-        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        string dbPath = System.IO.Path.Combine(_tempDirPath, PROJECT_DB);
         if (File.Exists(dbPath))
         {
             File.Delete(dbPath);
@@ -126,7 +128,7 @@ public class DBManager
                 throw new FileNotFoundException($"프로젝트 파일이 존재하지 않습니다: {filePath}");
             }
 
-            string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
+            string metadataPath = System.IO.Path.Combine(_tempDirPath, METADATA_FILE);
             if (File.Exists(metadataPath))
             {
                 string json = File.ReadAllText(metadataPath, Encoding.UTF8);
@@ -228,8 +230,8 @@ public class DBManager
             // 메타데이터 업데이트 및 저장
             _projectFilePath = filePath;
             projectMetadata.LastModifiedDate = DateTime.Now;
-            projectMetadata.ProjectName = Path.GetFileNameWithoutExtension(filePath);
-            string metadataPath = Path.Combine(_tempDirPath, METADATA_FILE);
+            projectMetadata.ProjectName = System.IO.Path.GetFileNameWithoutExtension(filePath);
+            string metadataPath = System.IO.Path.Combine(_tempDirPath, METADATA_FILE);
             string json = JsonSerializer.Serialize(projectMetadata);
             File.WriteAllText(metadataPath, json);
 
@@ -478,7 +480,7 @@ public class DBManager
     public List<NodeModel> GetAllNodes()
     {
         List<NodeModel> nodes = new List<NodeModel>();
-        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        string dbPath = System.IO.Path.Combine(_tempDirPath, PROJECT_DB);
         if (!File.Exists(dbPath)) return nodes;
 
         using (var conn = new SQLiteConnection(GetConnectionString()))
@@ -517,7 +519,7 @@ public class DBManager
     public List<LinkModel> GetAllLinks()
     {
         List<LinkModel> links = new List<LinkModel>();
-        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        string dbPath = System.IO.Path.Combine(_tempDirPath, PROJECT_DB);
         if (!File.Exists(dbPath)) return links;
 
         using (var conn = new SQLiteConnection(GetConnectionString()))
@@ -551,7 +553,7 @@ public class DBManager
     public List<PropertyItem> GetAllProperties()
     {
         List<PropertyItem> properties = new List<PropertyItem>();
-        string dbPath = Path.Combine(_tempDirPath, PROJECT_DB);
+        string dbPath = System.IO.Path.Combine(_tempDirPath, PROJECT_DB);
         if (!File.Exists(dbPath)) return properties;
 
         using (var conn = new SQLiteConnection(GetConnectionString()))

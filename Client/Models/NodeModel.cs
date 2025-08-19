@@ -11,8 +11,9 @@ using System.Windows.Media;
 
 namespace Client.Models
 {
-    // INFO_TYPES 테이블의 데이터 구조에 해당하는 클래스
-    public class NodeProcessType
+    // INFO_TYPES 테이블의 데이터 구조에 해당하는 클래스
+    // 이 클래스는 INotifyPropertyChanged가 필요하지 않음
+    public class NodeProcessType
     {
         public int ID { get; set; }
         public string NAME { get; set; }
@@ -23,20 +24,20 @@ namespace Client.Models
 
     public class NodeModel : INotifyPropertyChanged
     {
-        // PropertyChanged 이벤트 정의
-        public event PropertyChangedEventHandler PropertyChanged;
+        // PropertyChanged 이벤트 정의
+        public event PropertyChangedEventHandler PropertyChanged;
 
-        // 속성 변경 이벤트를 발생시키는 메서드
-        protected void OnPropertyChanged([CallerMemberName] string name = null)
+        // 속성 변경 이벤트를 발생시키는 메서드
+        protected void OnPropertyChanged([CallerMemberName] string name = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
+        //---------------------------------------------------------
+        // INFO_NODES 테이블과 일치하는 속성들
 
-        // INFO_NODES 테이블과 일치하는 속성들
-
-        // 노드 번호 (Primary Key)
-        private int _idNode;
+        // 노드 번호 (Primary Key)
+        private int _idNode;
         public int ID_NODE
         {
             get => _idNode;
@@ -50,8 +51,8 @@ namespace Client.Models
             }
         }
 
-        // 노드 제목
-        private string _nodeTitle;
+        // 노드 제목
+        private string _nodeTitle;
         public string NODE_TITLE
         {
             get => _nodeTitle;
@@ -65,8 +66,8 @@ namespace Client.Models
             }
         }
 
-        // 시작일
-        private DateTime? _dateStart;
+        // 시작일
+        private DateTime? _dateStart;
         public DateTime? DATE_START
         {
             get => _dateStart;
@@ -80,8 +81,8 @@ namespace Client.Models
             }
         }
 
-        // 종료일
-        private DateTime? _dateEnd;
+        // 종료일
+        private DateTime? _dateEnd;
         public DateTime? DATE_END
         {
             get => _dateEnd;
@@ -95,8 +96,8 @@ namespace Client.Models
             }
         }
 
-        // 담당자
-        private string _assignee;
+        // 담당자
+        private string _assignee;
         public string Assignee
         {
             get => _assignee;
@@ -110,8 +111,8 @@ namespace Client.Models
             }
         }
 
-        // 노드 타입 (INFO_TYPES 테이블의 ID와 연결)
-        private int _idType;
+        // 노드 타입 (INFO_TYPES 테이블의 ID와 연결)
+        private int _idType;
         public int ID_TYPE
         {
             get => _idType;
@@ -121,20 +122,35 @@ namespace Client.Models
                 {
                     _idType = value;
                     OnPropertyChanged(nameof(ID_TYPE));
+                }
+            }
+        }
+        //---------------------------------------------------------
+        // 💡 UI 표시를 위한 추가 속성 (INotifyPropertyChanged 구현)
+        private NodeProcessType _processType;
+        public NodeProcessType ProcessType
+        {
+            get => _processType;
+            set
+            {
+                if (_processType != value)
+                {
+                    _processType = value;
+                    OnPropertyChanged(nameof(ProcessType));
 
-                    // ID_TYPE 변경 시 노드 색상과 타입 정보 업데이트
-                    UpdateNodeColorAndType();
+                    // ProcessType 객체가 변경되면 ID_TYPE과 NodeColor도 업데이트
+                    if (_processType != null)
+                    {
+                        this.ID_TYPE = _processType.ID;
+                        this.NodeColor = Color.FromRgb((byte)_processType.COLOR_R, (byte)_processType.COLOR_G, (byte)_processType.COLOR_B);
+                    }
                 }
             }
         }
 
-        //---------------------------------------------------------
-        // UI 표시를 위한 추가 속성
-        // DB에서 가져온 타입 정보 (이 속성은 INotifyPropertyChanged 구현 필요 없음)
-        public NodeProcessType ProcessType { get; set; }
 
-        // UI에 바인딩할 Color 속성
-        private Color _nodeColor;
+        // UI에 바인딩할 Color 속성
+        private Color _nodeColor;
         public Color NodeColor
         {
             get => _nodeColor;
@@ -150,8 +166,8 @@ namespace Client.Models
 
         private double _xPosition;
         private double _yPosition;
-        // 캔버스 내의 X 좌표입니다. (뷰의 위치와 관련된 속성)
-        public double XPosition
+        // 캔버스 내의 X 좌표입니다. (뷰의 위치와 관련된 속성)
+        public double XPosition
         {
             get => _xPosition;
             set
@@ -164,8 +180,8 @@ namespace Client.Models
             }
         }
 
-        // 캔버스 내의 Y 좌표입니다. (뷰의 위치와 관련된 속성)
-        public double YPosition
+        // 캔버스 내의 Y 좌표입니다. (뷰의 위치와 관련된 속성)
+        public double YPosition
         {
             get => _yPosition;
             set
@@ -184,7 +200,7 @@ namespace Client.Models
             get => _width;
             set
             {
-                if(_width != value)
+                if (_width != value)
                 {
                     _width = value;
                     OnPropertyChanged(nameof(Width));
@@ -198,7 +214,7 @@ namespace Client.Models
             get => _height;
             set
             {
-                if(_height != value)
+                if (_height != value)
                 {
                     _height = value;
                     OnPropertyChanged(nameof(Height));
@@ -219,8 +235,8 @@ namespace Client.Models
             }
         }
 
-        // 사용자 정의 속성을 저장하는 컬렉션
-        private ObservableCollection<PropertyItem> _customProperties;
+        // 사용자 정의 속성을 저장하는 컬렉션
+        private ObservableCollection<PropertyItem> _customProperties;
         public ObservableCollection<PropertyItem> CustomProperties
         {
             get => _customProperties;
@@ -231,25 +247,23 @@ namespace Client.Models
             }
         }
 
-        //---------------------------------------------------------
-        // 생성자
-        public NodeModel()
+        //---------------------------------------------------------
+        // 생성자
+        public NodeModel()
         {
             CustomProperties = new ObservableCollection<PropertyItem>();
         }
 
-        // DB에서 데이터를 불러온 후 호출할 메서드
-        public void UpdateNodeColorAndType(NodeProcessType type = null)
+        // DB에서 데이터를 불러온 후 호출할 메서드 (더 이상 필요하지 않음)
+        public void UpdateNodeColorAndType(NodeProcessType type = null)
         {
             if (type != null)
             {
-                // NodeType 객체의 RGB 값을 사용해 색상 설정
                 this.NodeColor = Color.FromRgb((byte)type.COLOR_R, (byte)type.COLOR_G, (byte)type.COLOR_B);
                 this.ProcessType = type;
             }
             else
             {
-                // 기본값 설정
                 this.NodeColor = Colors.Gray;
                 this.ProcessType = new NodeProcessType { NAME = "알 수 없음" };
             }
