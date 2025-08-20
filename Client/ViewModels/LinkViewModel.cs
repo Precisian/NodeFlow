@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Windows;
+using System.Windows.Shapes;
 using Client.Models;
 using Client.ViewModels;
 
@@ -89,11 +90,28 @@ namespace Client.ViewModels
                 }
             }
         }
+        /// <summary>
+        /// 뷰에서 직접 바인딩할 수 있는 라인 객체입니다.
+        /// </summary>
+        private Line _line;
+        public Line Line
+        {
+            get => _line;
+            set
+            {
+                if (_line != value)
+                {
+                    _line = value;
+                    OnPropertyChanged(nameof(Line));
+                }
+            }
+        }
 
         //public Line
         public LinkViewModel(NodeViewModel startNode, NodeViewModel endNode)
         {
-            LinkData = new LinkModel();
+            LinkData = new LinkModel(startNode.NodeData.ID_NODE, endNode.NodeData.ID_NODE);
+
             StartNode = startNode;
             EndNode = endNode;
         }

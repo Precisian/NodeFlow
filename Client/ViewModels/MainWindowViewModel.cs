@@ -129,8 +129,6 @@ namespace Client.ViewModels
                 }
             }
         }
-        private NodeViewModel _startLinkNode;
-
         private ObservableCollection<LinkViewModel> _links;
         public ObservableCollection<LinkViewModel> Links
         {
@@ -290,41 +288,22 @@ namespace Client.ViewModels
         // 이 메서드는 NodeViewModel의 커맨드로부터 호출됩니다.
         private void ConnectNodes(object parameter)
         {
-            if (parameter is NodeViewModel node)
+            if (parameter is LinkViewModel link)
             {
-                if (_startLinkNode == null)
+                //이미 링크가 존재하는지 확인하는 로직 추가
+                var existingLink = Links.FirstOrDefault(l => (l.StartNode == link.StartNode && l.EndNode == link.EndNode));
+
+                // 이미 같은 링크가 존재하면 새로 만들지 않습니다.
+                if (existingLink == null)
                 {
-                    _startLinkNode = node;
-                    Console.WriteLine("링크 시작 : " + _startLinkNode.NodeData.ID_NODE);
-                }
-                else if (_startLinkNode != node)
-                {
-                    // 이미 링크가 존재하는지 확인하는 로직 추가
-                    var existingLink = Links.FirstOrDefault(l =>
-                        (l.StartNode == _startLinkNode && l.EndNode == node) ||
-                        (l.StartNode == node && l.EndNode == _startLinkNode));
+                    Console.WriteLine($"링크 생성: {link.StartNode.NodeData.ID_NODE} -> {link.EndNode.NodeData.ID_NODE}");
 
-                    // 이미 같은 링크가 존재하면 새로 만들지 않습니다.
-                    if (existingLink == null)
-                    {
-                        Links.Add(new LinkViewModel(_startLinkNode, node));
-                        Console.WriteLine($"링크 생성: {_startLinkNode?.NodeData.ID_NODE} -> {node?.NodeData.ID_NODE}");
-
-                        Links.Last().LinkData.ID_NODE_SRC = _startLinkNode.NodeData.ID_NODE;
-                        Links.Last().LinkData.ID_NODE_TGT = node.NodeData.ID_NODE;
-
-                        _dbManager.AddLink(Links.Last().LinkData);
-                    }
-                    else
-                    {
-                        Console.WriteLine("이미 존재하는 링크입니다.");
-                    }
-
-                    _startLinkNode = null;
+                    this.Links.Add(link);
+                    _dbManager.AddLink(Links.Last().LinkData);
                 }
                 else
                 {
-                    _startLinkNode = null;
+                    Console.WriteLine("이미 존재하는 링크입니다.");
                 }
             }
         }
@@ -334,9 +313,19 @@ namespace Client.ViewModels
         {
             this._dbManager.CreateNewProject();
 
-            this.Nodes.Clear();
+            while (this.Links.Count > 0)
+            {
+                this.Links.Remove(this.Links.First());
+            }
+            while (this.Nodes.Count > 0)
+            {
+                this.Nodes.Remove(this.Nodes.First());
+            }
+
             this.IsProjectOpen = true;
+            this.IsDirty = false;
             this._currentFilePath = null;
+            this.SelectedNode = null;
             this.projectMetadata.ProjectName = "[제목 없음]";
             Console.WriteLine("[DBManager] 새 프로젝트 생성");
             UpdateWindowTitle();

@@ -1,4 +1,7 @@
-﻿using System.Runtime.ConstrainedExecution;
+﻿using Client.Models;
+using Client.ViewModels;
+using System.Collections.Specialized;
+using System.Runtime.ConstrainedExecution;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -9,8 +12,6 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
-using Client.ViewModels;
-using Client.Models;
 
 namespace Client.Views
 {
@@ -37,6 +38,28 @@ namespace Client.Views
             InitializeComponent();
             this.viewModel = viewModel;
             this.DataContext = this.viewModel;
+
+            if (this.viewModel.Links is INotifyCollectionChanged observableLinks)
+            {
+                observableLinks.CollectionChanged += OnLinksCollectionChanged;
+            }
+        }
+
+        private void OnLinksCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            // If items were removed from the collection
+            if (e.Action == NotifyCollectionChangedAction.Remove)
+            {
+                foreach (LinkViewModel linkViewModel in e.OldItems)
+                {
+                    // Remove the corresponding Line object from the canvas
+                    if (linkViewModel.Line != null)
+                    {
+                        mainCanvas.Children.Remove(linkViewModel.Line);
+                    }
+                }
+            }
+            // Add logic for other actions like Add, Replace, etc. if needed
         }
 
         private void AddNodeButton_Click(object sender, RoutedEventArgs e)
@@ -165,24 +188,25 @@ namespace Client.Views
                     NodeViewModel endNodeViewModel = endNodeControl.DataContext as NodeViewModel;
                     if (endNodeViewModel != null)
                     {
-                        // 뷰모델의 커맨드를 두 번 호출하여 링크를 완성합니다.
-                        // 첫 번째 호출은 시작 노드를, 두 번째 호출은 끝 노드를 지정합니다.
-                        viewModel.ConnectNodesCommand.Execute(_startLinkNode);
-                        viewModel.ConnectNodesCommand.Execute(endNodeViewModel);
-                    }
+                        LinkViewModel linkViewModel = new LinkViewModel(_startLinkNode, endNodeViewModel);
 
-                    // 💡 임시 선을 제거하지 않고, 영구적인 링크로 변환합니다.
-                    Line permanentLink = new Line
-                    {
-                        X1 = _tempLinkLine.X1,
-                        Y1 = _tempLinkLine.Y1,
-                        X2 = currentPosition.X, // 끝점은 현재 마우스 위치로
-                        Y2 = currentPosition.Y,
-                        Stroke = Brushes.Black, // 영구적인 선 색상을 검은색으로 변경
-                        StrokeThickness = 2
-                    };
-                    mainCanvas.Children.Remove(_tempLinkLine);
-                    mainCanvas.Children.Add(permanentLink);
+                        // 💡 임시 선을 제거하지 않고, 영구적인 링크로 변환합니다.
+                        Line permanentLink = new Line
+                        {
+                            X1 = _tempLinkLine.X1,
+                            Y1 = _tempLinkLine.Y1,
+                            X2 = currentPosition.X, // 끝점은 현재 마우스 위치로
+                            Y2 = currentPosition.Y,
+                            Stroke = Brushes.Black, // 영구적인 선 색상을 검은색으로 변경
+                            StrokeThickness = 2
+                        };
+
+                        linkViewModel.Line = permanentLink;
+                        viewModel.ConnectNodesCommand.Execute(linkViewModel);
+
+                        mainCanvas.Children.Remove(_tempLinkLine);
+                        mainCanvas.Children.Add(permanentLink);
+                    }
                 }
                 else
                 {

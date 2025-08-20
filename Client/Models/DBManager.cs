@@ -386,7 +386,6 @@ public class DBManager
             {
                 cmdCountBefore.Parameters.AddWithValue("@nodeId", nodeId);
                 long countBefore = (long)cmdCountBefore.ExecuteScalar();
-                Console.WriteLine($"[DBManager] 삭제 전, 연결된 링크 수: {countBefore}개");
             }
 
             // 2. 링크 삭제
@@ -403,7 +402,6 @@ public class DBManager
             using (var cmdCountAfter = new SQLiteCommand(countSqlAfter, conn))
             {
                 long countAfter = (long)cmdCountAfter.ExecuteScalar();
-                Console.WriteLine($"[DBManager] 삭제 후, 총 링크 수: {countAfter}개");
             }
 
             conn.Close();
@@ -532,13 +530,12 @@ public class DBManager
                 {
                     while (reader.Read())
                     {
-                        links.Add(new LinkModel
-                        {
-                            ID = reader.GetInt32(0),
-                            ID_NODE_SRC = reader.GetInt32(1),
-                            ID_NODE_TGT = reader.GetInt32(2),
-                            CREATED_AT = reader.IsDBNull(3) ? (DateTime?)null : DateTime.ParseExact(reader.GetString(3), "yyyy-MM-dd HH:mm:ss", null)
-                        });
+                        LinkModel linkModel = new LinkModel(reader.GetInt32(1), reader.GetInt32(2));
+                        linkModel.ID = reader.GetInt32(0);
+                        linkModel.CREATED_AT = reader.IsDBNull(3) ? (DateTime?)null : DateTime.ParseExact(reader.GetString(3), "yyyy-MM-dd HH:mm:ss", null);
+
+
+                        links.Add(linkModel);
                     }
                 }
             }
